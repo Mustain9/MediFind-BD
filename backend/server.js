@@ -19,7 +19,6 @@ app.get("/api/profile", verifyToken, (req, res) => {
     });
 });
 
-
 // Middleware
 app.use(cors());
 app.use(express.json());

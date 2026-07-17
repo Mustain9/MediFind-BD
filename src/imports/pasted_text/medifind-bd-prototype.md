@@ -362,6 +362,3 @@ Interactive Map Placeholder
 Responsive Desktop Layout (1440px)
 
 Professional healthcare illustrations.
-
-Important:
-Do not design this as an online medicine shop. Design it as a Medicine Finder platform where registered pharmacies update their own medicine inventory. Users can search medicines, compare prices, reserve medicines, and locate nearby pharmacies. Pharmacy staff manage inventory through their dashboard, while the Admin manages pharmacies, medicines, and users.

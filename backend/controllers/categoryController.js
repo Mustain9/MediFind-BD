@@ -13,6 +13,7 @@ exports.getCategories = (req, res) => {
         }
     );
 };
+ 
 
 // Add Category
 exports.addCategory = (req, res) => {

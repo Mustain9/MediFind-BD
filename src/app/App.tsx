@@ -1,20 +1,4 @@
-import api from "../services/api";
-import { useState, useEffect } from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "./components/ui/dialog";
-
-import { Input } from "./components/ui/input";
-
-import { Button } from "./components/ui/button";
-
-import { Label } from "./components/ui/label";
-
-import { Textarea } from "./components/ui/textarea";
+import { useState } from "react";
 import {
   Search, MapPin, Bell, ChevronDown, Menu, X, Home, Pill, Building2,
   Users, BarChart3, Settings, LogOut, Star, Phone, Clock, Navigation,
@@ -146,10 +130,6 @@ function PublicNavbar({ setPage, setPanel }: { setPage: (p: Page) => void; setPa
           <button onClick={() => setPage("home")} className="hover:text-blue-600 transition-colors">Home</button>
           <button onClick={() => setPage("medicine-search")} className="hover:text-blue-600 transition-colors">Find Medicine</button>
           <button onClick={() => setPage("pharmacy-locator")} className="hover:text-blue-600 transition-colors">Pharmacies</button>
-          <button
-            onClick={() => { setPage("pharmacy-dashboard"); setPanel("pharmacy"); }}
-            className="hover:text-blue-600 transition-colors"
-          >Pharmacy Portal</button>
           <button onClick={() => setPage("login")} className="px-4 py-2 rounded-lg border border-blue-600 text-blue-600 hover:bg-blue-50 transition-colors">Sign In</button>
           <button onClick={() => setPage("register")} className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors">Register</button>
         </div>
@@ -470,6 +450,76 @@ function HomePage({ setPage, setPanel }: { setPage: (p: Page) => void; setPanel:
 }
 
 function LoginPage({ setPage, setPanel }: { setPage: (p: Page) => void; setPanel: (p: Panel) => void }) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const handleLogin = async () => {
+
+    try{
+
+        const response = await fetch("http://localhost:5000/api/auth/login",{
+
+            method:"POST",
+
+            headers:{
+                "Content-Type":"application/json"
+            },
+
+            body:JSON.stringify({
+
+                email,
+                password
+
+            })
+
+        });
+
+        const data = await response.json();
+
+        if(data.success){
+
+            localStorage.setItem("token",data.token);
+
+            localStorage.setItem("user",JSON.stringify(data.user));
+
+            localStorage.setItem("role", data.user.role);
+
+            if(data.user.role==="customer"){
+
+                setPanel("user");
+                setPage("user-dashboard");
+            }
+
+            else if(data.user.role==="pharmacy"){
+
+                setPanel("pharmacy");
+                setPage("pharmacy-dashboard");
+
+            }
+
+            else if(data.user.role==="admin"){
+
+                setPanel("admin");
+                setPage("admin-dashboard");
+
+            }
+
+        }
+
+        else{
+
+            alert(data.message);
+
+        }
+
+    }
+
+    catch(err){
+
+        alert("Server Error");
+
+    }
+
+  }
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100 flex items-center justify-center p-6">
       <div className="w-full max-w-md">
@@ -484,11 +534,21 @@ function LoginPage({ setPage, setPanel }: { setPage: (p: Page) => void; setPanel
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-1.5">Phone / Email</label>
-              <input className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all" placeholder="01XXXXXXXXX or email@example.com" />
+             <input
+                  value={email}
+                  onChange={(e)=>setEmail(e.target.value)}
+                  placeholder="01XXXXXXXXX or email@example.com"
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm"
+                  />
             </div>
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-1.5">Password</label>
-              <input type="password" className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all" placeholder="••••••••" />
+                 <input
+                    type="password"
+                    value={password}
+                    onChange={(e)=>setPassword(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm"
+                    />
             </div>
             <div className="flex items-center justify-between text-sm">
               <label className="flex items-center gap-2 text-slate-600">
@@ -498,7 +558,7 @@ function LoginPage({ setPage, setPanel }: { setPage: (p: Page) => void; setPanel
             </div>
           </div>
           <button
-            onClick={() => { setPage("user-dashboard"); setPanel("user"); }}
+            onClick={handleLogin}
             className="w-full mt-6 py-3 bg-blue-600 text-white rounded-xl font-semibold text-sm hover:bg-blue-700 transition-colors shadow-sm"
           >
             Sign In
@@ -506,14 +566,6 @@ function LoginPage({ setPage, setPanel }: { setPage: (p: Page) => void; setPanel
           <div className="mt-4 text-center text-sm text-slate-500">
             Don&apos;t have an account?{" "}
             <button onClick={() => setPage("register")} className="text-blue-600 font-semibold hover:underline">Register now</button>
-          </div>
-          <div className="mt-4 pt-4 border-t border-slate-100 text-center">
-            <button
-              onClick={() => { setPage("pharmacy-dashboard"); setPanel("pharmacy"); }}
-              className="text-sm text-green-600 font-semibold hover:underline"
-            >
-              Sign in as Pharmacy Staff →
-            </button>
           </div>
         </div>
         <p className="text-center text-xs text-slate-400 mt-6">
@@ -525,6 +577,57 @@ function LoginPage({ setPage, setPanel }: { setPage: (p: Page) => void; setPanel
 }
 
 function RegisterPage({ setPage }: { setPage: (p: Page) => void }) {
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [password, setPassword] = useState("");
+  const [role, setRole] = useState("customer");
+
+  const handleRegister = async () => {
+
+    try {
+
+        const response = await fetch("http://localhost:5000/api/auth/register", {
+
+            method: "POST",
+
+            headers: {
+                "Content-Type": "application/json"
+            },
+
+            body: JSON.stringify({
+
+                full_name: fullName,
+                email,
+                phone,
+                password,
+                role
+
+            })
+
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+
+            alert("Registration Successful!");
+
+            setPage("login");
+
+        } else {
+
+            alert(data.message);
+
+        }
+
+    } catch (error) {
+
+        alert("Server Error");
+
+    }
+
+  };
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100 flex items-center justify-center p-6">
       <div className="w-full max-w-md">
@@ -540,7 +643,12 @@ function RegisterPage({ setPage }: { setPage: (p: Page) => void }) {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">First Name</label>
-                <input className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all" placeholder="Rafiqul" />
+                <input
+                    value={fullName}
+                    onChange={(e)=>setFullName(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all"
+                    placeholder="Rafiqul"
+                    />
               </div>
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Last Name</label>
@@ -549,28 +657,87 @@ function RegisterPage({ setPage }: { setPage: (p: Page) => void }) {
             </div>
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-1.5">Phone Number</label>
-              <input className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all" placeholder="01XXXXXXXXX" />
+              <input
+                    value={phone}
+                    onChange={(e)=>setPhone(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all"
+                    placeholder="01XXXXXXXXX"
+                    />
             </div>
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-1.5">Email (Optional)</label>
-              <input className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all" placeholder="email@example.com" />
+              <input
+                    value={email}
+                    onChange={(e)=>setEmail(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all"
+                    placeholder="email@example.com"
+                    />
             </div>
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-1.5">Password</label>
-              <input type="password" className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all" placeholder="Min. 8 characters" />
+              <input
+                    value={password}
+                    onChange={(e)=>setPassword(e.target.value)}
+                    type="password"
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all"
+                    placeholder="Min. 8 characters"
+                    />
             </div>
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1.5">Area / Thana</label>
-              <select className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-blue-400 bg-white">
-                <option>Dhanmondi, Dhaka</option>
-                <option>Gulshan, Dhaka</option>
-                <option>Mirpur, Dhaka</option>
-                <option>Shahbag, Dhaka</option>
-              </select>
+            <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+              Address
+            </label>
+
+            <input
+              className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all"
+              placeholder="Enter your address"
+            />
             </div>
+            <div>
+            <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+              Register As
+            </label>
+
+            <select
+                value={role}
+                onChange={(e) => setRole(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl border border-slate-200"
+            >
+                <option value="customer">Customer</option>
+                <option value="pharmacy">Pharmacy</option>
+            </select>
+            </div>
+
+            {role === "pharmacy" && (
+              <>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                    Pharmacy Name
+                  </label>
+                  <input
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200"
+                    placeholder="ABC Pharmacy"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                    License Number
+                  </label>
+                  <input
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200"
+                    placeholder="DGDA-123456"
+                  />
+                </div>
+              </>
+            )}
+
           </div>
-          <button className="w-full mt-6 py-3 bg-green-600 text-white rounded-xl font-semibold text-sm hover:bg-green-700 transition-colors shadow-sm">
-            Create Account
+          <button
+              onClick={handleRegister}
+              className="w-full mt-6 py-3 bg-green-600 text-white rounded-xl font-semibold text-sm hover:bg-green-700 transition-colors shadow-sm"
+          >
+              Create Account
           </button>
           <div className="mt-4 text-center text-sm text-slate-500">
             Already have an account?{" "}
@@ -800,7 +967,7 @@ function MedicineSearchPage({ setPage }: { setPage: (p: Page) => void }) {
 }
 
 function MedicineDetailsPage({ setPage }: { setPage: (p: Page) => void }) {
-  const med = medicines[0];
+  const med = MEDICINES[0];
   return (
     <div className="p-6 space-y-5">
       <button onClick={() => setPage("medicine-search")} className="flex items-center gap-2 text-sm text-slate-500 hover:text-blue-600 transition-colors">
@@ -1453,64 +1620,16 @@ function AdminPharmacyApproval() {
 }
 
 function AdminMedicineManagement() {
-
-  const [medicines, setMedicines] = useState<any[]>([]);
-  const [showAddModal, setShowAddModal] = useState(false);
-
-  const [formData, setFormData] = useState({
-    brand_name: "",
-    generic_name: "",
-    manufacturer: "",
-    strength: "",
-    description: ""
-  });
-
-  useEffect(() => {
-    loadMedicines();
-  }, []);
-
-  async function loadMedicines() {
-    try {
-      const res = await api.get("/medicines");
-      setMedicines(res.data);
-    } catch (err) {
-      console.error(err);
-    }
-  }
-
-  async function addMedicine() {
-    try {
-      await api.post("/medicines", formData);
-
-      await loadMedicines(); // This should NOT be red
-
-      setShowAddModal(false);
-
-      setFormData({
-        brand_name: "",
-        generic_name: "",
-        manufacturer: "",
-        strength: "",
-        description: ""
-      });
-
-    } catch (err) {
-      console.error(err);
-    }
-  }
-
   return (
-    <>
     <div className="p-6 space-y-5">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Medicine Master List</h1>
           <p className="text-slate-500 text-sm mt-1">Manage the global medicine database</p>
         </div>
-        <Button onClick={() => setShowAddModal(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-            Add Medicine
-        </Button>
+        <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700">
+          <Plus size={16} />Add Medicine
+        </button>
       </div>
 
       <div className="grid grid-cols-4 gap-4">
@@ -1548,27 +1667,13 @@ function AdminMedicineManagement() {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
-            {medicines.map(m => (
+            {MEDICINES.map(m => (
               <tr key={m.id} className="hover:bg-slate-50/50 transition-colors">
-                <td className="px-6 py-4 text-sm font-semibold text-slate-800">
-                    {m.brand_name}
-                </td>
-
-                <td className="px-6 py-4 text-sm text-slate-500">
-                    {m.generic_name}
-                </td>
-
-                <td className="px-6 py-4 text-sm text-slate-500">
-                    {m.manufacturer}
-                </td>
-
-                <td className="px-6 py-4">
-                    <Badge label={m.category_id || "N/A"} variant="blue" />
-                </td>
-
-                <td className="px-6 py-4 text-sm text-slate-500">
-                    {m.strength}
-                </td>
+                <td className="px-6 py-4 text-sm font-semibold text-slate-800">{m.name}</td>
+                <td className="px-6 py-4 text-sm text-slate-500">{m.generic}</td>
+                <td className="px-6 py-4 text-sm text-slate-500">{m.mfr}</td>
+                <td className="px-6 py-4"><Badge label={m.category} variant="blue" /></td>
+                <td className="px-6 py-4 text-sm text-slate-500">{m.strength}</td>
                 <td className="px-6 py-4">
                   <div className="flex gap-2">
                     <button className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600"><Edit2 size={14} /></button>
@@ -1581,113 +1686,6 @@ function AdminMedicineManagement() {
         </table>
       </div>
     </div>
-    <Dialog open={showAddModal} onOpenChange={setShowAddModal}>
-
-  <DialogContent className="sm:max-w-lg">
-
-    <DialogHeader>
-      <DialogTitle>Add Medicine</DialogTitle>
-    </DialogHeader>
-
-    <div className="space-y-4">
-
-      <div>
-        <Label>Brand Name</Label>
-
-        <Input
-          value={formData.brand_name}
-          onChange={(e)=>
-            setFormData({
-              ...formData,
-              brand_name:e.target.value
-            })
-          }
-        />
-
-      </div>
-
-      <div>
-        <Label>Generic Name</Label>
-
-        <Input
-          value={formData.generic_name}
-          onChange={(e)=>
-            setFormData({
-              ...formData,
-              generic_name:e.target.value
-            })
-          }
-        />
-
-      </div>
-
-      <div>
-        <Label>Manufacturer</Label>
-
-        <Input
-          value={formData.manufacturer}
-          onChange={(e)=>
-            setFormData({
-              ...formData,
-              manufacturer:e.target.value
-            })
-          }
-        />
-
-      </div>
-
-      <div>
-        <Label>Strength</Label>
-
-        <Input
-          value={formData.strength}
-          onChange={(e)=>
-            setFormData({
-              ...formData,
-              strength:e.target.value
-            })
-          }
-        />
-
-      </div>
-
-      <div>
-        <Label>Description</Label>
-
-        <Textarea
-          value={formData.description}
-          onChange={(e)=>
-            setFormData({
-              ...formData,
-              description:e.target.value
-            })
-          }
-        />
-
-      </div>
-
-    </div>
-
-    <DialogFooter>
-
-      <Button
-        variant="outline"
-        onClick={() => setShowAddModal(false)}
-      >
-        Cancel
-      </Button>
-
-      <Button onClick={addMedicine}>
-        Save
-      </Button>
-
-    </DialogFooter>
-
-  </DialogContent>
-
-</Dialog>
-
-    </>
   );
 }
 
@@ -1847,29 +1845,6 @@ function SettingsPage() {
 export default function App() {
   const [page, setPage] = useState<Page>("home");
   const [panel, setPanel] = useState<Panel>("public");
-  const [medicines, setMedicines] = useState<Medicine[]>([]);
-
-  useEffect(() => {
-
-    loadMedicines();
-
-}, []);
-
-async function loadMedicines() {
-
-    try {
-
-        const res = await api.get("/medicines");
-
-        setMedicines(res.data);
-
-    } catch (err) {
-
-        console.log(err);
-
-    }
-
-}
 
   const isPublic = panel === "public";
 

@@ -65,6 +65,7 @@ exports.login = (req, res) => {
 // Register User
 exports.register = async (req, res) => {
     const { full_name, email, phone, password, role } = req.body;
+    console.log(req.body);
 
     try {
         // Check if email already exists
@@ -89,7 +90,7 @@ exports.register = async (req, res) => {
                         email,
                         phone,
                         hashedPassword,
-                        role || "user"
+                        role || "customer"
                     ],
                     (err) => {
                         if (err) return res.status(500).json(err);
