@@ -1,4 +1,4 @@
-import { useState } from "react";
+import {useState,useEffect} from "react";
 import {
   Search, MapPin, Bell, ChevronDown, Menu, X, Home, Pill, Building2,
   Users, BarChart3, Settings, LogOut, Star, Phone, Clock, Navigation,
@@ -20,6 +20,7 @@ type Page =
   | "reports" | "settings";
 
 type Panel = "public" | "user" | "pharmacy" | "admin";
+
 
 const MEDICINES = [
   { id: 1, name: "Napa Extra", generic: "Paracetamol + Caffeine", mfr: "Beximco Pharma", strength: "500mg+65mg", category: "Analgesic", price: 35, available: 3, img: "https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=80&h=80&fit=crop&auto=format" },
@@ -85,6 +86,7 @@ const PENDING_PHARMACIES = [
   { id: 2, name: "MediCare Drug Store", owner: "Farida Yasmin", area: "Motijheel, Dhaka", applied: "24 Jun 2026", license: "DDA-2026-1235" },
   { id: 3, name: "Green Cross Pharmacy", owner: "Shafiqul Alam", area: "Banani, Dhaka", applied: "23 Jun 2026", license: "DDA-2026-1236" },
 ];
+
 
 // ─── Shared UI primitives ────────────────────────────────────────────────────
 
@@ -219,7 +221,14 @@ function Sidebar({ panel, page, setPage, setPanel }: { panel: Panel; page: Page;
 }
 
 function DashboardNav({ panel }: { panel: Panel }) {
-  const labels: Record<Panel, string> = { public: "", user: "Rafiqul Islam", pharmacy: "Dhaka Medical Pharmacy", admin: "Administrator" };
+  const user = JSON.parse(localStorage.getItem("user") || "{}");
+
+  const labels = {
+    public: "",
+    user: user.full_name || "",
+    pharmacy: user.full_name || "",
+    admin: "Administrator"
+};
   return (
     <header className="h-16 bg-white border-b border-black/5 flex items-center justify-between px-6 sticky top-0 z-40">
       <div />
@@ -781,10 +790,11 @@ function ForgotPasswordPage({ setPage }: { setPage: (p: Page) => void }) {
 }
 
 function UserDashboard({ setPage }: { setPage: (p: Page) => void }) {
+  const user = JSON.parse(localStorage.getItem("user") || "{}");
   return (
     <div className="p-6 space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-slate-800">Good Morning, Rafiqul! 👋</h1>
+        <h1 className="text-2xl font-bold text-slate-800">Good Morning, {user.full_name}! 👋</h1>
         <p className="text-slate-500 text-sm mt-1">Find your medicine, compare prices, and stay healthy.</p>
       </div>
 
@@ -803,7 +813,7 @@ function UserDashboard({ setPage }: { setPage: (p: Page) => void }) {
       </div>
 
       <div className="grid grid-cols-3 gap-5">
-        <StatCard icon={Search} label="Searches Today" value="12" sub="Last: Napa Extra" color="bg-blue-500" />
+        <StatCard icon={Search} label="Searches Today" value="0" sub="Last: Napa Extra" color="bg-blue-500" />
         <StatCard icon={ShoppingBag} label="Active Reservations" value="2" sub="1 ready for pickup" color="bg-green-500" />
         <StatCard icon={Star} label="Saved Pharmacies" value="4" sub="Dhaka Medical is nearest" color="bg-amber-500" />
       </div>
@@ -813,7 +823,7 @@ function UserDashboard({ setPage }: { setPage: (p: Page) => void }) {
         <div className="bg-white rounded-2xl p-5 shadow-sm border border-black/5">
           <h3 className="font-bold text-slate-800 mb-4">Recent Searches</h3>
           <div className="space-y-3">
-            {["Napa Extra", "Seclo 20", "Azithro 500", "Fexo 120"].map(m => (
+            {[].map(m => (
               <div key={m} className="flex items-center justify-between py-2 border-b border-slate-50 last:border-0">
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
@@ -831,10 +841,7 @@ function UserDashboard({ setPage }: { setPage: (p: Page) => void }) {
         <div className="bg-white rounded-2xl p-5 shadow-sm border border-black/5">
           <h3 className="font-bold text-slate-800 mb-4">My Reservations</h3>
           <div className="space-y-3">
-            {[
-              { med: "Napa Extra", ph: "Dhaka Medical Pharmacy", status: "Approved" },
-              { med: "Seclo 20", ph: "Popular Drug House", status: "Pending" },
-            ].map(r => (
+            {[].map(r => (
               <div key={r.med} className="p-3 rounded-xl bg-slate-50 flex items-start justify-between">
                 <div>
                   <p className="text-sm font-semibold text-slate-800">{r.med}</p>
@@ -851,7 +858,7 @@ function UserDashboard({ setPage }: { setPage: (p: Page) => void }) {
       <div className="bg-white rounded-2xl p-5 shadow-sm border border-black/5">
         <h3 className="font-bold text-slate-800 mb-4">Favorite Pharmacies</h3>
         <div className="grid grid-cols-4 gap-4">
-          {PHARMACIES.slice(0, 4).map(ph => (
+          {[].map(ph => (
             <div key={ph.id} className="p-4 rounded-xl border border-slate-100 hover:border-blue-200 transition-colors cursor-pointer">
               <Building2 size={20} className="text-green-500 mb-2" />
               <p className="text-sm font-semibold text-slate-800">{ph.name}</p>
@@ -866,14 +873,33 @@ function UserDashboard({ setPage }: { setPage: (p: Page) => void }) {
 }
 
 function MedicineSearchPage({ setPage }: { setPage: (p: Page) => void }) {
+  const [medicines, setMedicines] = useState<any[]>([]);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("All");
+
+
+useEffect(() => {
+    loadMedicines();
+}, []);
+
+const loadMedicines = async () => {
+    try {
+        const response = await fetch("http://localhost:5000/api/medicines");
+        const data = await response.json();
+        setMedicines(data);
+    } catch (err) {
+        console.error(err);
+    }
+};
   const categories = ["All", "Analgesic", "Antibiotic", "GIT", "Respiratory", "Antihistamine"];
 
-  const filtered = MEDICINES.filter(m =>
+  const filtered = medicines.filter((m: any) =>
     (category === "All" || m.category === category) &&
-    (m.name.toLowerCase().includes(search.toLowerCase()) || m.generic.toLowerCase().includes(search.toLowerCase()))
-  );
+    (
+        m.brand_name.toLowerCase().includes(search.toLowerCase()) ||
+        m.generic_name.toLowerCase().includes(search.toLowerCase())
+    )
+);
 
   return (
     <div className="p-6 space-y-5">
@@ -932,9 +958,9 @@ function MedicineSearchPage({ setPage }: { setPage: (p: Page) => void }) {
                 <Pill size={28} className="text-blue-400" />
               </div>
               <div className="flex-1">
-                <h3 className="font-bold text-slate-800">{med.name}</h3>
-                <p className="text-xs text-slate-400">{med.generic}</p>
-                <p className="text-xs text-slate-400">{med.mfr}</p>
+                <h3 className="font-bold text-slate-800">{med.brand_name}</h3>
+                <p className="text-xs text-slate-400">{med.generic_name}</p>
+                <p className="text-xs text-slate-400">{med.manufacturer}</p>
                 <Badge label={med.category} variant="blue" />
               </div>
             </div>
@@ -1127,6 +1153,7 @@ function PriceComparisonPage({ setPage }: { setPage: (p: Page) => void }) {
 
 function PharmacyLocatorPage() {
   const [selected, setSelected] = useState<number | null>(null);
+  const [pharmacies, setPharmacies] = useState<any[]>([]);
   return (
     <div className="p-6 space-y-5">
       <div>
@@ -1620,6 +1647,22 @@ function AdminPharmacyApproval() {
 }
 
 function AdminMedicineManagement() {
+  const [medicines, setMedicines] = useState<any[]>([]);
+  const [search, setSearch] = useState("");
+
+  useEffect(() => {
+    loadMedicines();
+  }, []);
+
+  const loadMedicines = async () => {
+    try {
+      const response = await fetch("http://localhost:5000/api/medicines");
+      const data = await response.json();
+      setMedicines(data);
+    } catch (err) {
+      console.log(err);
+    }
+  };
   return (
     <div className="p-6 space-y-5">
       <div className="flex items-center justify-between">
@@ -1645,7 +1688,12 @@ function AdminMedicineManagement() {
         <div className="px-6 py-4 border-b border-slate-100 flex gap-4">
           <div className="flex-1 flex items-center gap-3 px-4 py-2.5 rounded-xl border border-slate-200">
             <Search size={16} className="text-slate-400" />
-            <input className="flex-1 outline-none text-sm text-slate-700" placeholder="Search medicine..." />
+            <input
+              value={search}
+              onChange={(e)=>setSearch(e.target.value)}
+              className="flex-1 outline-none text-sm text-slate-700"
+              placeholder="Search medicine..."
+          />
           </div>
           <select className="px-4 py-2.5 rounded-xl border border-slate-200 text-sm bg-white">
             <option>All Categories</option>
@@ -1667,11 +1715,16 @@ function AdminMedicineManagement() {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
-            {MEDICINES.map(m => (
+            {medicines
+              .filter(m =>
+                  m.brand_name.toLowerCase().includes(search.toLowerCase()) ||
+                  m.generic_name.toLowerCase().includes(search.toLowerCase())
+              )
+              .map(m => (
               <tr key={m.id} className="hover:bg-slate-50/50 transition-colors">
-                <td className="px-6 py-4 text-sm font-semibold text-slate-800">{m.name}</td>
-                <td className="px-6 py-4 text-sm text-slate-500">{m.generic}</td>
-                <td className="px-6 py-4 text-sm text-slate-500">{m.mfr}</td>
+                <td className="px-6 py-4 text-sm font-semibold text-slate-800">{m.brand_name}</td>
+                <td className="px-6 py-4 text-sm text-slate-500">{m.generic_name}</td>
+                <td className="px-6 py-4 text-sm text-slate-500">{m.manufacturer}</td>
                 <td className="px-6 py-4"><Badge label={m.category} variant="blue" /></td>
                 <td className="px-6 py-4 text-sm text-slate-500">{m.strength}</td>
                 <td className="px-6 py-4">
@@ -1757,87 +1810,142 @@ function ReportsPage() {
 
 function SettingsPage() {
   const [tab, setTab] = useState("Profile");
-  return (
-    <div className="p-6 space-y-5 max-w-2xl">
-      <h1 className="text-2xl font-bold text-slate-800">Settings</h1>
-      <div className="flex gap-2">
-        {["Profile", "Password", "Notifications", "Language"].map(t => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${tab === t ? "bg-blue-600 text-white" : "bg-white text-slate-600 border border-black/5 hover:bg-slate-50"}`}
-          >{t}</button>
-        ))}
+  const [fullName,setFullName]=useState("");
+  const [phone,setPhone]=useState("");
+  const [email,setEmail]=useState("");
+
+  useEffect(()=>{
+
+    loadProfile();
+
+},[]);
+
+  const loadProfile=async()=>{
+
+    const token=localStorage.getItem("token");
+
+    const response=await fetch(
+        "http://localhost:5000/api/user/profile",
+        {
+
+            headers:{
+                Authorization:`Bearer ${token}`
+            }
+
+        }
+    );
+
+    const data=await response.json();
+
+    setFullName(data.full_name);
+    setPhone(data.phone);
+    setEmail(data.email);
+
+}
+
+const handleUpdateProfile=async()=>{
+
+    const token=localStorage.getItem("token");
+
+    const response=await fetch(
+        "http://localhost:5000/api/user/profile",
+        {
+
+            method:"PUT",
+
+            headers:{
+                "Content-Type":"application/json",
+                Authorization:`Bearer ${token}`
+            },
+
+            body:JSON.stringify({
+
+                full_name:fullName,
+                phone:phone
+
+            })
+
+        }
+    );
+
+    const data=await response.json();
+
+    alert(data.message);
+
+    loadProfile();
+
+}
+
+return (
+  <div>
+    {tab === "Profile" && (
+      <div className="space-y-5">
+
+        <div className="flex items-center gap-5 pb-5 border-b border-slate-100">
+          <div className="w-16 h-16 rounded-2xl bg-blue-100 flex items-center justify-center">
+            <User size={28} className="text-blue-600" />
+          </div>
+
+          <div>
+            <p className="font-bold text-slate-800">{fullName}</p>
+            <p className="text-sm text-slate-400">Patient Account</p>
+            <button className="text-xs text-blue-600 hover:underline mt-1">
+              Change Photo
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+
+          <div className="col-span-2">
+            <label className="text-xs font-semibold text-slate-400 uppercase tracking-wide">
+              Full Name
+            </label>
+
+            <input
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              className="mt-1 w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-slate-400 uppercase tracking-wide">
+              Phone
+            </label>
+
+            <input
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              className="mt-1 w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-slate-400 uppercase tracking-wide">
+              Email
+            </label>
+
+            <input
+              value={email}
+              readOnly
+              className="mt-1 w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-100 text-sm"
+            />
+          </div>
+
+        </div>
+
+        <button
+          onClick={handleUpdateProfile}
+          className="px-6 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition-colors"
+        >
+          Save Changes
+        </button>
+
       </div>
-      <div className="bg-white rounded-2xl p-6 shadow-sm border border-black/5">
-        {tab === "Profile" && (
-          <div className="space-y-5">
-            <div className="flex items-center gap-5 pb-5 border-b border-slate-100">
-              <div className="w-16 h-16 rounded-2xl bg-blue-100 flex items-center justify-center">
-                <User size={28} className="text-blue-600" />
-              </div>
-              <div>
-                <p className="font-bold text-slate-800">Rafiqul Islam</p>
-                <p className="text-sm text-slate-400">Patient Account</p>
-                <button className="text-xs text-blue-600 hover:underline mt-1">Change Photo</button>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              {[["First Name", "Rafiqul"], ["Last Name", "Islam"], ["Phone", "01711-234567"], ["Email", "rafiqul@gmail.com"], ["Area", "Dhanmondi, Dhaka"]].map(([l, v]) => (
-                <div key={l}>
-                  <label className="text-xs font-semibold text-slate-400 uppercase tracking-wide">{l}</label>
-                  <input defaultValue={v} className="mt-1 w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100" />
-                </div>
-              ))}
-            </div>
-            <button className="px-6 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition-colors">Save Changes</button>
-          </div>
-        )}
-        {tab === "Password" && (
-          <div className="space-y-4 max-w-sm">
-            {["Current Password", "New Password", "Confirm Password"].map(l => (
-              <div key={l}>
-                <label className="text-sm font-semibold text-slate-700 mb-1.5 block">{l}</label>
-                <input type="password" className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100" placeholder="••••••••" />
-              </div>
-            ))}
-            <button className="px-6 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700">Update Password</button>
-          </div>
-        )}
-        {tab === "Notifications" && (
-          <div className="space-y-4">
-            {[
-              { label: "Reservation Confirmations", desc: "Get notified when your reservation is approved" },
-              { label: "Price Alerts", desc: "Notify when medicine price drops at nearby pharmacies" },
-              { label: "Stock Alerts", desc: "Notify when a reserved medicine is back in stock" },
-              { label: "Promotional Offers", desc: "Get offers and discounts from registered pharmacies" },
-            ].map(n => (
-              <div key={n.label} className="flex items-center justify-between py-3 border-b border-slate-50 last:border-0">
-                <div>
-                  <p className="text-sm font-semibold text-slate-800">{n.label}</p>
-                  <p className="text-xs text-slate-400">{n.desc}</p>
-                </div>
-                <div className="w-11 h-6 bg-blue-600 rounded-full relative cursor-pointer flex-shrink-0">
-                  <div className="w-4 h-4 bg-white rounded-full absolute right-1 top-1 shadow-sm" />
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-        {tab === "Language" && (
-          <div className="space-y-3">
-            <p className="text-sm font-semibold text-slate-700 mb-3">Select Display Language</p>
-            {[["English", "Currently Active"], ["বাংলা (Bengali)", "আপনার ভাষায় ব্যবহার করুন"]].map(([l, s]) => (
-              <div key={l} className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${l === "English" ? "border-blue-500 bg-blue-50" : "border-slate-100 hover:border-blue-200"}`}>
-                <p className="font-semibold text-slate-800">{l}</p>
-                <p className="text-xs text-slate-400">{s}</p>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
+    )}
+  </div>
+);
 }
 
 // ─── Main App ────────────────────────────────────────────────────────────────

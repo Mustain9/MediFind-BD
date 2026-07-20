@@ -24,6 +24,7 @@ const getProfile = (req, res) => {
 
 // Update profile
 const updateProfile = (req, res) => {
+
     const userId = req.user.id;
 
     const { full_name, phone } = req.body;
@@ -32,13 +33,21 @@ const updateProfile = (req, res) => {
         "UPDATE users SET full_name=?, phone=? WHERE id=?",
         [full_name, phone, userId],
         (err) => {
-            if (err) return res.status(500).json(err);
+
+            if (err) {
+                return res.status(500).json({
+                    message: err.message
+                });
+            }
 
             res.json({
+                success: true,
                 message: "Profile updated successfully"
             });
+
         }
     );
+
 };
 
 // Change password
