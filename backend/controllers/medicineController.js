@@ -144,3 +144,26 @@ exports.deleteMedicine = (req, res) => {
     );
 
 };
+
+exports.getMedicineStats = (req, res) => {
+
+    const sql = `
+        SELECT
+            COUNT(*) AS totalMedicines,
+            COUNT(DISTINCT category) AS totalCategories,
+            COUNT(DISTINCT manufacturer) AS totalManufacturers,
+            COUNT(DISTINCT generic_name) AS totalGenerics
+        FROM medicines
+    `;
+
+    db.query(sql, (err, result) => {
+
+        if (err) {
+            return res.status(500).json(err);
+        }
+
+        res.json(result[0]);
+
+    });
+
+};

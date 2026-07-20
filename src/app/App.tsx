@@ -3,7 +3,7 @@ import {
   Search, MapPin, Bell, ChevronDown, Menu, X, Home, Pill, Building2,
   Users, BarChart3, Settings, LogOut, Star, Phone, Clock, Navigation,
   Package, ShoppingBag, CheckCircle, XCircle, AlertTriangle, TrendingUp,
-  FileText, Shield, ChevronRight, Plus, Edit2, Eye, ArrowLeft, Filter,
+  FileText, Shield, ChevronRight, Plus, Edit2, Eye,  Trash2, ArrowLeft, Filter,
   RefreshCw, Download, User, Lock, Globe, HelpCircle, Stethoscope
 } from "lucide-react";
 import {
@@ -1296,8 +1296,39 @@ function PharmacyDashboard({ setPage }: { setPage: (p: Page) => void }) {
 }
 
 function PharmacyInventory() {
-  const [search, setSearch] = useState("");
-  const filtered = INVENTORY.filter(m => m.name.toLowerCase().includes(search.toLowerCase()));
+    const [search, setSearch] = useState("");
+
+    const [inventory, setInventory] = useState<any[]>([]);
+
+    const filtered = inventory.filter(item =>
+        item.brand_name.toLowerCase().includes(search.toLowerCase()) ||
+        item.generic_name.toLowerCase().includes(search.toLowerCase())
+    );
+
+    useEffect(() => {
+    loadInventory();
+    }, []);
+
+    const loadInventory = async () => {
+
+        try {
+
+            const response = await fetch(
+                "http://localhost:5000/api/inventory"
+            );
+
+            const data = await response.json();
+
+            setInventory(data);
+
+        } catch (err) {
+
+            console.log(err);
+
+        }
+
+    };
+
   return (
     <div className="p-6 space-y-5">
       <div className="flex items-center justify-between">
@@ -1344,10 +1375,10 @@ function PharmacyInventory() {
                     <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
                       <Pill size={14} className="text-blue-400" />
                     </div>
-                    <p className="text-sm font-semibold text-slate-800">{item.name}</p>
+                    <p className="text-sm font-semibold text-slate-800">{item.brand_name}</p>
                   </div>
                 </td>
-                <td className="px-6 py-4 text-sm text-slate-500">{item.generic}</td>
+                <td className="px-6 py-4 text-sm text-slate-500">{item.generic_name}</td>
                 <td className="px-6 py-4">
                   <span className={`text-sm font-bold ${item.stock === 0 ? "text-red-500" : item.stock < 15 ? "text-amber-500" : "text-slate-800"}`}>
                     {item.stock}
@@ -1356,8 +1387,20 @@ function PharmacyInventory() {
                 <td className="px-6 py-4 text-sm font-semibold text-blue-600">৳{item.price}</td>
                 <td className="px-6 py-4">
                   <Badge
-                    label={item.status}
-                    variant={item.status === "Available" ? "green" : item.status === "Low Stock" ? "yellow" : "red"}
+                    label={
+                            item.stock === 0
+                                ? "Out of Stock"
+                                : item.stock < 15
+                                ? "Low Stock"
+                                : "Available"
+                        }
+                    variant={
+                              item.stock === 0
+                                  ? "red"
+                                  : item.stock < 15
+                                  ? "yellow"
+                                  : "green"
+                          }
                   />
                 </td>
                 <td className="px-6 py-4">
@@ -1650,8 +1693,30 @@ function AdminMedicineManagement() {
   const [medicines, setMedicines] = useState<any[]>([]);
   const [search, setSearch] = useState("");
 
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
+
+  const [editingId, setEditingId] = useState<number | null>(null);
+
+  const [newMedicine, setNewMedicine] = useState({
+      brand_name: "",
+      generic_name: "",
+      manufacturer: "",
+      category: "",
+      strength: "",
+      description: ""
+  });
+
+  const [stats, setStats] = useState({
+    totalMedicines: 0,
+    totalCategories: 0,
+    totalManufacturers: 0,
+    totalGenerics: 0
+});
+
   useEffect(() => {
     loadMedicines();
+    loadStats();
   }, []);
 
   const loadMedicines = async () => {
@@ -1663,6 +1728,141 @@ function AdminMedicineManagement() {
       console.log(err);
     }
   };
+
+  const loadStats = async () => {
+
+    try {
+
+        const response = await fetch(
+            "http://localhost:5000/api/medicines/stats"
+        );
+
+        const data = await response.json();
+
+        setStats(data);
+
+    } catch (err) {
+
+        console.log(err);
+
+    }
+
+};
+  const addMedicine = async () => {
+
+    try{
+
+        const response = await fetch(
+            "http://localhost:5000/api/medicines",
+            {
+                method:"POST",
+                headers:{
+                    "Content-Type":"application/json"
+                },
+                body:JSON.stringify(newMedicine)
+            }
+        );
+
+        const data = await response.json();
+
+        if(data.success){
+
+            alert("Medicine Added Successfully");
+
+            setShowAddModal(false);
+
+            setNewMedicine({
+                brand_name:"",
+                generic_name:"",
+                manufacturer:"",
+                category:"",
+                strength:"",
+                description:""
+            });
+
+            loadMedicines();
+            loadStats();
+
+        }
+
+    }catch(err){
+
+        console.log(err);
+
+    }
+
+};
+const editMedicine = async () => {
+
+    try {
+
+        const response = await fetch(
+            `http://localhost:5000/api/medicines/${editingId}`,
+            {
+                method: "PUT",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(newMedicine)
+            }
+        );
+
+        const data = await response.json();
+
+        if (data.success) {
+
+            alert("Medicine Updated Successfully");
+
+            setShowEditModal(false);
+
+            loadMedicines();
+            loadStats();
+
+        }
+
+    } catch (err) {
+
+        console.log(err);
+
+    }
+
+};
+
+const deleteMedicine = async (id: number) => {
+
+    const confirmDelete = window.confirm(
+        "Are you sure you want to delete this medicine?"
+    );
+
+    if (!confirmDelete) return;
+
+    try {
+
+        const response = await fetch(
+            `http://localhost:5000/api/medicines/${id}`,
+            {
+                method: "DELETE"
+            }
+        );
+
+        const data = await response.json();
+
+        if (data.success) {
+
+            alert("Medicine Deleted Successfully");
+
+            loadMedicines();
+            loadStats();
+
+        }
+
+    } catch (err) {
+
+        console.log(err);
+
+    }
+
+};
   return (
     <div className="p-6 space-y-5">
       <div className="flex items-center justify-between">
@@ -1670,13 +1870,19 @@ function AdminMedicineManagement() {
           <h1 className="text-2xl font-bold text-slate-800">Medicine Master List</h1>
           <p className="text-slate-500 text-sm mt-1">Manage the global medicine database</p>
         </div>
-        <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700">
+        <button
+          onClick={()=>setShowAddModal(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700"
+      >
           <Plus size={16} />Add Medicine
         </button>
       </div>
 
       <div className="grid grid-cols-4 gap-4">
-        {[["All Medicines", "1,240", "bg-blue-500"], ["Categories", "24", "bg-green-500"], ["Manufacturers", "68", "bg-amber-500"], ["Generics", "342", "bg-purple-500"]].map(([l, v, c]) => (
+        {[["All Medicines", stats.totalMedicines, "bg-blue-500"],
+          ["Categories", stats.totalCategories, "bg-green-500"],
+          ["Manufacturers", stats.totalManufacturers, "bg-amber-500"],
+          ["Generics", stats.totalGenerics, "bg-purple-500"]].map(([l, v, c]) => (
           <div key={l} className={`${c} rounded-2xl p-5 text-white`}>
             <p className="text-3xl font-bold">{v}</p>
             <p className="text-sm opacity-80 mt-1">{l}</p>
@@ -1729,8 +1935,33 @@ function AdminMedicineManagement() {
                 <td className="px-6 py-4 text-sm text-slate-500">{m.strength}</td>
                 <td className="px-6 py-4">
                   <div className="flex gap-2">
-                    <button className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600"><Edit2 size={14} /></button>
-                    <button className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600"><Eye size={14} /></button>
+                    <button
+                          onClick={() => {
+
+                              setEditingId(m.id);
+
+                              setNewMedicine({
+                                  brand_name: m.brand_name,
+                                  generic_name: m.generic_name,
+                                  manufacturer: m.manufacturer,
+                                  category: m.category,
+                                  strength: m.strength,
+                                  description: m.description || ""
+                              });
+
+                              setShowEditModal(true);
+
+                          }}
+                          className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600"
+                      >
+                          <Edit2 size={14} />
+                      </button>
+                      <button
+                            onClick={() => deleteMedicine(m.id)}
+                            className="p-2 rounded-lg border border-red-200 text-red-600 hover:bg-red-50"
+                        >
+                            <Trash2 size={14} />
+                        </button>
                   </div>
                 </td>
               </tr>
@@ -1738,6 +1969,214 @@ function AdminMedicineManagement() {
           </tbody>
         </table>
       </div>
+
+      {showAddModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+
+        <div className="bg-white rounded-2xl w-[500px] p-6 space-y-4">
+
+          <h2 className="text-xl font-bold">
+        Add Medicine
+      </h2>
+
+      <input
+        placeholder="Brand Name"
+        value={newMedicine.brand_name}
+        onChange={(e)=>
+          setNewMedicine({
+            ...newMedicine,
+            brand_name:e.target.value
+          })
+        }
+        className="w-full border rounded-lg p-3"
+      />
+
+      <input
+        placeholder="Generic Name"
+        value={newMedicine.generic_name}
+        onChange={(e)=>
+          setNewMedicine({
+            ...newMedicine,
+            generic_name:e.target.value
+          })
+        }
+        className="w-full border rounded-lg p-3"
+      />
+
+      <input
+        placeholder="Manufacturer"
+        value={newMedicine.manufacturer}
+        onChange={(e)=>
+          setNewMedicine({
+            ...newMedicine,
+            manufacturer:e.target.value
+          })
+        }
+        className="w-full border rounded-lg p-3"
+      />
+
+      <input
+        placeholder="Category"
+        value={newMedicine.category}
+        onChange={(e)=>
+          setNewMedicine({
+            ...newMedicine,
+            category:e.target.value
+          })
+        }
+        className="w-full border rounded-lg p-3"
+      />
+
+      <input
+        placeholder="Strength"
+        value={newMedicine.strength}
+        onChange={(e)=>
+          setNewMedicine({
+            ...newMedicine,
+            strength:e.target.value
+          })
+        }
+        className="w-full border rounded-lg p-3"
+      />
+
+      <textarea
+        placeholder="Description"
+        value={newMedicine.description}
+        onChange={(e)=>
+          setNewMedicine({
+            ...newMedicine,
+            description:e.target.value
+          })
+        }
+        className="w-full border rounded-lg p-3"
+      />
+
+      <div className="flex justify-end gap-3">
+
+        <button
+          onClick={()=>setShowAddModal(false)}
+          className="px-5 py-2 rounded-lg border"
+        >
+          Cancel
+        </button>
+
+        <button
+          onClick={addMedicine}
+          className="px-5 py-2 rounded-lg bg-blue-600 text-white"
+        >
+          Save
+        </button>
+
+      </div>
+
+    </div>
+
+  </div>
+)}
+
+{showEditModal && (
+  <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+
+    <div className="bg-white rounded-2xl w-[500px] p-6 space-y-4">
+
+      <h2 className="text-xl font-bold">
+        Edit Medicine
+      </h2>
+
+      <input
+        placeholder="Brand Name"
+        value={newMedicine.brand_name}
+        onChange={(e)=>
+          setNewMedicine({
+            ...newMedicine,
+            brand_name:e.target.value
+          })
+        }
+        className="w-full border rounded-lg p-3"
+      />
+
+      <input
+        placeholder="Generic Name"
+        value={newMedicine.generic_name}
+        onChange={(e)=>
+          setNewMedicine({
+            ...newMedicine,
+            generic_name:e.target.value
+          })
+        }
+        className="w-full border rounded-lg p-3"
+      />
+
+      <input
+        placeholder="Manufacturer"
+        value={newMedicine.manufacturer}
+        onChange={(e)=>
+          setNewMedicine({
+            ...newMedicine,
+            manufacturer:e.target.value
+          })
+        }
+        className="w-full border rounded-lg p-3"
+      />
+
+      <input
+        placeholder="Category"
+        value={newMedicine.category}
+        onChange={(e)=>
+          setNewMedicine({
+            ...newMedicine,
+            category:e.target.value
+          })
+        }
+        className="w-full border rounded-lg p-3"
+      />
+
+      <input
+        placeholder="Strength"
+        value={newMedicine.strength}
+        onChange={(e)=>
+          setNewMedicine({
+            ...newMedicine,
+            strength:e.target.value
+          })
+        }
+        className="w-full border rounded-lg p-3"
+      />
+
+      <textarea
+        placeholder="Description"
+        value={newMedicine.description}
+        onChange={(e)=>
+          setNewMedicine({
+            ...newMedicine,
+            description:e.target.value
+          })
+        }
+        className="w-full border rounded-lg p-3"
+      />
+
+      <div className="flex justify-end gap-3">
+
+        <button
+          onClick={() => setShowEditModal(false)}
+          className="px-5 py-2 rounded-lg border"
+        >
+          Cancel
+        </button>
+
+        <button
+          onClick={editMedicine}
+          className="px-5 py-2 rounded-lg bg-blue-600 text-white"
+        >
+          Update
+        </button>
+
+      </div>
+
+    </div>
+
+  </div>
+)}
     </div>
   );
 }

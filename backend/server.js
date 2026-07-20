@@ -8,6 +8,9 @@ require("dotenv").config();
 const db = require("./config/db");
 const authRoutes = require("./routes/authRoutes");
 
+const inventoryRoutes = require("./routes/inventoryRoutes");
+
+
 const app = express();
 
 const verifyToken = require("./middleware/authMiddleware");
@@ -24,6 +27,7 @@ app.use(cors());
 app.use(express.json());
 app.use("/api/medicines", medicineRoutes);
 app.use("/api/categories", categoryRoutes);
+app.use("/api/inventory", inventoryRoutes);
 
 // Routes
 app.get("/", (req, res) => {
