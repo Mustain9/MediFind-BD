@@ -1,4 +1,5 @@
-import {useState,useEffect} from "react";
+import { useState, useEffect } from "react";
+import api from "./api";
 import {
   Search, MapPin, Bell, ChevronDown, Menu, X, Home, Pill, Building2,
   Users, BarChart3, Settings, LogOut, Star, Phone, Clock, Navigation,
@@ -80,6 +81,11 @@ const RESERVATIONS = [
   { id: "RES-004", patient: "Sadia Akter", medicine: "Azithro 500", qty: 1, date: "26 Jun 2026", status: "Rejected" },
   { id: "RES-005", patient: "Tanvir Ahmed", medicine: "Montiget 10", qty: 2, date: "25 Jun 2026", status: "Completed" },
 ];
+
+
+
+
+
 
 const PENDING_PHARMACIES = [
   { id: 1, name: "HealthPlus Pharmacy", owner: "Mizanur Rahman", area: "Uttara, Dhaka", applied: "25 Jun 2026", license: "DDA-2026-1234" },
@@ -254,7 +260,15 @@ function DashboardNav({ panel }: { panel: Panel }) {
 
 // ─── Pages ───────────────────────────────────────────────────────────────────
 
-function HomePage({ setPage, setPanel }: { setPage: (p: Page) => void; setPanel: (p: Panel) => void }) {
+function HomePage({
+  setPage,
+  setPanel,
+  setSelectedMedicine,
+}: {
+  setPage: (p: Page) => void;
+  setPanel: (p: Panel) => void;
+  setSelectedMedicine: (medicine: any) => void;
+}) {
   const [query, setQuery] = useState("");
   return (
     <div className="min-h-screen bg-slate-50">
@@ -872,283 +886,1611 @@ function UserDashboard({ setPage }: { setPage: (p: Page) => void }) {
   );
 }
 
-function MedicineSearchPage({ setPage }: { setPage: (p: Page) => void }) {
+function MedicineSearchPage({
+  setPage,
+  setSelectedMedicine
+}: {
+  setPage: (p: Page) => void;
+  setSelectedMedicine: (medicine: any) => void;
+}) {
   const [medicines, setMedicines] = useState<any[]>([]);
   const [search, setSearch] = useState("");
-  const [category, setCategory] = useState("All");
+  const [loading, setLoading] = useState(false);
 
+  // ==========================================
+  // LOAD MEDICINE AVAILABILITY
+  // ==========================================
 
-useEffect(() => {
-    loadMedicines();
-}, []);
-
-const loadMedicines = async () => {
+  const loadMedicines = async (searchText = "") => {
     try {
-        const response = await fetch("http://localhost:5000/api/medicines");
-        const data = await response.json();
-        setMedicines(data);
-    } catch (err) {
-        console.error(err);
-    }
-};
-  const categories = ["All", "Analgesic", "Antibiotic", "GIT", "Respiratory", "Antihistamine"];
+      setLoading(true);
 
-  const filtered = medicines.filter((m: any) =>
-    (category === "All" || m.category === category) &&
-    (
-        m.brand_name.toLowerCase().includes(search.toLowerCase()) ||
-        m.generic_name.toLowerCase().includes(search.toLowerCase())
-    )
-);
+      const response = await fetch(
+        `http://localhost:5000/api/medicines/availability/search?search=${encodeURIComponent(searchText)}`
+      );
+
+      const data = await response.json();
+
+      if (!data.success) {
+        console.error("Failed to load medicines");
+        setMedicines([]);
+        return;
+      }
+
+      // ==========================================
+      // GROUP PHARMACY RESULTS BY MEDICINE
+      // ==========================================
+
+      const grouped: Record<number, any> = {};
+
+      (data.results || []).forEach((item: any) => {
+        if (!grouped[item.medicine_id]) {
+          grouped[item.medicine_id] = {
+            id: item.medicine_id,
+            brand_name: item.brand_name,
+            generic_name: item.generic_name,
+            strength: item.strength,
+            dosage_form: item.dosage_form,
+            manufacturer: item.manufacturer || item.mfr || "",
+            category: item.category || "",
+            description: item.description || "",
+            uses: item.uses || "",
+            dosage: item.dosage || "",
+            side_effects: item.side_effects || "",
+
+            pharmacies: [],
+            available: 0,
+            price: Number(item.price) || 0,
+          };
+        }
+
+        grouped[item.medicine_id].pharmacies.push(item);
+
+        // Count pharmacies where stock is available
+        if (Number(item.stock) > 0) {
+          grouped[item.medicine_id].available += 1;
+        }
+
+        // Find lowest price
+        if (
+          Number(item.price) > 0 &&
+          (
+            grouped[item.medicine_id].price === 0 ||
+            Number(item.price) < grouped[item.medicine_id].price
+          )
+        ) {
+          grouped[item.medicine_id].price = Number(item.price);
+        }
+      });
+
+      setMedicines(Object.values(grouped));
+
+    } catch (error) {
+      console.error("Failed to load medicine availability:", error);
+      setMedicines([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+
+  // ==========================================
+  // LOAD ON PAGE OPEN
+  // ==========================================
+
+  useEffect(() => {
+    loadMedicines("");
+  }, []);
+
+
+  // ==========================================
+  // SEARCH
+  // ==========================================
+
+  const handleSearch = () => {
+    loadMedicines(search);
+  };
+
 
   return (
     <div className="p-6 space-y-5">
+
+      {/* HEADER */}
       <div>
-        <h1 className="text-2xl font-bold text-slate-800">Find Medicine</h1>
-        <p className="text-slate-500 text-sm mt-1">Search from 1,240+ medicines across 86 registered pharmacies</p>
+        <h1 className="text-2xl font-bold text-slate-800">
+          Find Medicine
+        </h1>
+
+        <p className="text-slate-500 text-sm mt-1">
+          Search medicines and compare prices across pharmacies
+        </p>
       </div>
 
+
+      {/* SEARCH BOX */}
       <div className="bg-white rounded-2xl p-5 shadow-sm border border-black/5">
-        <div className="flex gap-4 mb-4">
+
+        <div className="flex gap-3">
+
           <div className="flex-1 flex items-center gap-3 px-4 py-3 rounded-xl border border-slate-200 focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
-            <Search size={18} className="text-slate-400" />
+
+            <Search
+              size={18}
+              className="text-slate-400"
+            />
+
             <input
               value={search}
-              onChange={e => setSearch(e.target.value)}
+              onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  handleSearch();
+                }
+              }}
               className="flex-1 outline-none text-sm text-slate-700"
               placeholder="Search by brand name or generic name..."
             />
+
           </div>
-          <select className="px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-blue-400 bg-white">
-            <option>All Distances</option>
-            <option>Within 1 km</option>
-            <option>Within 2 km</option>
-            <option>Within 5 km</option>
-          </select>
-          <select className="px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-blue-400 bg-white">
-            <option>Any Price</option>
-            <option>Under ৳50</option>
-            <option>৳50–৳200</option>
-            <option>Above ৳200</option>
-          </select>
-          <button className="px-4 py-3 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 flex items-center gap-2 text-sm">
-            <Filter size={16} />Filters
+
+
+          <button
+            onClick={handleSearch}
+            className="px-6 py-3 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition-colors"
+          >
+            Search
           </button>
+
         </div>
-        <div className="flex gap-2">
-          {categories.map(c => (
-            <button
-              key={c}
-              onClick={() => setCategory(c)}
-              className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-colors ${
-                category === c ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-              }`}
-            >{c}</button>
+
+      </div>
+
+
+      {/* RESULT COUNT */}
+      <div className="flex items-center justify-between">
+
+        <p className="text-sm text-slate-500">
+          {loading
+            ? "Searching..."
+            : `${medicines.length} medicines found`}
+        </p>
+
+        {search && !loading && (
+          <button
+            onClick={() => {
+              setSearch("");
+              loadMedicines("");
+            }}
+            className="text-sm text-blue-600 hover:underline"
+          >
+            Clear Search
+          </button>
+        )}
+
+      </div>
+
+
+      {/* LOADING */}
+      {loading && (
+        <div className="bg-white rounded-2xl p-10 text-center shadow-sm border border-black/5">
+
+          <div className="inline-block w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-3" />
+
+          <p className="text-sm text-slate-500">
+            Searching medicines...
+          </p>
+
+        </div>
+      )}
+
+
+      {/* NO RESULTS */}
+      {!loading && medicines.length === 0 && (
+        <div className="bg-white rounded-2xl p-10 text-center shadow-sm border border-black/5">
+
+          <Pill
+            size={40}
+            className="mx-auto text-slate-300 mb-3"
+          />
+
+          <h3 className="font-semibold text-slate-700">
+            No medicines found
+          </h3>
+
+          <p className="text-sm text-slate-400 mt-1">
+            Try searching with another medicine name.
+          </p>
+
+        </div>
+      )}
+
+
+      {/* MEDICINE CARDS */}
+      {!loading && medicines.length > 0 && (
+
+        <div className="grid grid-cols-3 gap-5">
+
+          {medicines.map((med) => (
+
+            <div
+              key={med.id}
+              className="bg-white rounded-2xl p-5 shadow-sm border border-black/5 hover:shadow-md transition-shadow"
+            >
+
+              {/* MEDICINE HEADER */}
+              <div className="flex items-start gap-4 mb-4">
+
+                <div className="w-16 h-16 rounded-xl bg-blue-50 flex items-center justify-center flex-shrink-0">
+
+                  <Pill
+                    size={28}
+                    className="text-blue-400"
+                  />
+
+                </div>
+
+
+                <div className="flex-1">
+
+                  <h3 className="font-bold text-slate-800">
+                    {med.brand_name}
+                  </h3>
+
+                  <p className="text-xs text-slate-400">
+                    {med.generic_name || "Generic name not available"}
+                  </p>
+
+                  {med.strength && (
+                    <p className="text-xs text-slate-400 mt-1">
+                      {med.strength}
+                    </p>
+                  )}
+
+                </div>
+
+              </div>
+
+
+              {/* AVAILABILITY + PRICE */}
+              <div className="flex items-center justify-between py-3 border-t border-slate-50">
+
+                <div>
+
+                  <p className="text-xs text-slate-400">
+                    Available at
+                  </p>
+
+                  <p className="text-2xl font-bold text-green-600">
+                    {Number(med.available) || 0}
+                  </p>
+                </div>
+
+
+                <div className="text-right">
+
+                  <p className="text-xs text-slate-400">
+                    Lowest Price
+                  </p>
+
+                  <p className="text-xl font-bold text-blue-600">
+                    {med.price > 0
+                      ? `৳${med.price.toFixed(2)}`
+                      : "N/A"}
+                  </p>
+
+                </div>
+
+              </div>
+
+
+              {/* BUTTONS */}
+              <div className="flex gap-2 mt-3">
+
+                <button
+                  onClick={() => {
+                    localStorage.setItem(
+                      "selectedMedicine",
+                      JSON.stringify(med)
+                    );
+
+                    setPage("price-comparison");
+                  }}
+                  className="flex-1 py-2 text-xs font-semibold rounded-xl border border-blue-200 text-blue-600 hover:bg-blue-50 transition-colors"
+                >
+                  Compare Prices
+                </button>
+
+
+                  <button
+                      onClick={() => {
+                        setSelectedMedicine(med);
+                        localStorage.setItem("selectedMedicine", JSON.stringify(med));
+                        setPage("medicine-details");
+                      }}
+                    >
+                      Details
+                    </button>
+
+
+                <button
+                  onClick={() => {
+                    localStorage.setItem(
+                      "selectedMedicine",
+                      JSON.stringify(med)
+                    );
+
+                    setPage("medicine-details");
+                  }}
+                  className="flex-1 py-2 text-xs font-semibold rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+                >
+                  Reserve
+                </button>
+
+              </div>
+
+            </div>
+
           ))}
+
         </div>
-      </div>
 
-      <p className="text-sm text-slate-500">{filtered.length} results found</p>
+      )}
 
-      <div className="grid grid-cols-3 gap-5">
-        {filtered.map(med => (
-          <div key={med.id} className="bg-white rounded-2xl p-5 shadow-sm border border-black/5 hover:shadow-md transition-shadow">
-            <div className="flex items-start gap-4 mb-4">
-              <div className="w-16 h-16 rounded-xl bg-blue-50 flex items-center justify-center flex-shrink-0">
-                <Pill size={28} className="text-blue-400" />
-              </div>
-              <div className="flex-1">
-                <h3 className="font-bold text-slate-800">{med.brand_name}</h3>
-                <p className="text-xs text-slate-400">{med.generic_name}</p>
-                <p className="text-xs text-slate-400">{med.manufacturer}</p>
-                <Badge label={med.category} variant="blue" />
-              </div>
-            </div>
-            <div className="flex items-center justify-between py-3 border-t border-slate-50">
-              <div>
-                <p className="text-xs text-slate-400">Available at</p>
-                <p className="text-sm font-semibold text-green-600">{med.available} Pharmacies</p>
-              </div>
-              <div className="text-right">
-                <p className="text-xs text-slate-400">Lowest Price</p>
-                <p className="text-xl font-bold text-blue-600">৳{med.price}</p>
-              </div>
-            </div>
-            <div className="flex gap-2 mt-3">
-              <button onClick={() => setPage("price-comparison")} className="flex-1 py-2 text-xs font-semibold rounded-xl border border-blue-200 text-blue-600 hover:bg-blue-50 transition-colors">
-                Compare Prices
-              </button>
-              <button onClick={() => setPage("medicine-details")} className="flex-1 py-2 text-xs font-semibold rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors">
-                Details
-              </button>
-              <button className="flex-1 py-2 text-xs font-semibold rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition-colors">
-                Reserve
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
     </div>
   );
 }
 
-function MedicineDetailsPage({ setPage }: { setPage: (p: Page) => void }) {
-  const med = MEDICINES[0];
-  return (
-    <div className="p-6 space-y-5">
-      <button onClick={() => setPage("medicine-search")} className="flex items-center gap-2 text-sm text-slate-500 hover:text-blue-600 transition-colors">
-        <ArrowLeft size={16} /> Back to Search
-      </button>
+function MedicineDetailsPage({
+  setPage,
+  selectedMedicine,
+}: {
+  setPage: (p: Page) => void;
+  selectedMedicine: any;
+}) {
+  const [availability, setAvailability] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [selectedPharmacy, setSelectedPharmacy] = useState<any>(null);
+  const [quantity, setQuantity] = useState(1);
+  const [showReserveModal, setShowReserveModal] = useState(false);
+  const [reserving, setReserving] = useState(false);
 
-      <div className="grid grid-cols-3 gap-5">
-        <div className="col-span-2 space-y-5">
-          <div className="bg-white rounded-2xl p-6 shadow-sm border border-black/5">
-            <div className="flex items-start gap-6">
-              <div className="w-24 h-24 rounded-2xl bg-blue-50 flex items-center justify-center flex-shrink-0">
-                <Pill size={40} className="text-blue-400" />
-              </div>
-              <div className="flex-1">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <h1 className="text-2xl font-bold text-slate-800">{med.name}</h1>
-                    <p className="text-slate-500">{med.generic} — {med.strength}</p>
-                    <p className="text-sm text-slate-400">{med.mfr} · {med.category}</p>
-                  </div>
-                  <Badge label="Available" variant="green" />
-                </div>
-                <div className="mt-4 flex items-center gap-4">
-                  <div className="text-center">
-                    <p className="text-xs text-slate-400">Lowest Price</p>
-                    <p className="text-2xl font-bold text-blue-600">৳{med.price}</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-xs text-slate-400">Available At</p>
-                    <p className="text-2xl font-bold text-green-600">{med.available}</p>
-                    <p className="text-xs text-slate-400">Pharmacies</p>
-                  </div>
-                </div>
-                <div className="mt-4 flex gap-3">
-                  <button onClick={() => setPage("price-comparison")} className="px-5 py-2.5 border border-blue-200 text-blue-600 rounded-xl text-sm font-semibold hover:bg-blue-50 transition-colors">
-                    Compare Prices
-                  </button>
-                  <button className="px-5 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition-colors">
-                    Reserve Medicine
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
+  const med = selectedMedicine;
 
-          {[
-            { title: "Description", content: "Napa Extra is a combination of Paracetamol and Caffeine. Paracetamol acts as an analgesic and antipyretic, while Caffeine enhances the analgesic effect of Paracetamol." },
-            { title: "Uses", content: "Headache, Migraine, Toothache, Backache, Muscular pain, Dysmenorrhoea, Neuralgia, Fever due to cold and flu." },
-            { title: "Dosage", content: "Adults: 1-2 tablets every 4-6 hours as needed. Maximum 8 tablets in 24 hours. Children under 12: Not recommended without medical advice." },
-            { title: "Side Effects", content: "Nausea, stomach upset, headache. Rare but serious: liver damage (with overdose), allergic reactions. Caffeine may cause insomnia or nervousness in sensitive individuals." },
-          ].map(s => (
-            <div key={s.title} className="bg-white rounded-2xl p-5 shadow-sm border border-black/5">
-              <h3 className="font-bold text-slate-800 mb-2">{s.title}</h3>
-              <p className="text-sm text-slate-600 leading-relaxed">{s.content}</p>
-            </div>
-          ))}
-        </div>
+  const medicineName =
+    med?.brand_name || med?.name || "Medicine";
+  const genericName =
+    med?.generic_name || med?.generic || "Generic name not available";
+  const strength = med?.strength || "";
+  const manufacturer =
+    med?.manufacturer || med?.mfr || "";
+  const category = med?.category || "";
 
-        <div className="space-y-5">
-          <div className="bg-white rounded-2xl p-5 shadow-sm border border-black/5">
-            <h3 className="font-bold text-slate-800 mb-4">Available Pharmacies</h3>
-            <div className="space-y-4">
-              {PHARMACIES.slice(0, 3).map(ph => (
-                <div key={ph.id} className="p-3 rounded-xl bg-slate-50 space-y-2">
-                  <p className="text-sm font-semibold text-slate-800">{ph.name}</p>
-                  <p className="text-xs text-slate-400 flex items-center gap-1"><MapPin size={10} />{ph.area} · {ph.distance}</p>
-                  <div className="flex items-center justify-between">
-                    <span className="text-base font-bold text-blue-600">৳{med.price + Math.floor(Math.random() * 5)}</span>
-                    <button className="text-xs px-3 py-1.5 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700">Reserve</button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4">
-            <p className="text-xs font-semibold text-amber-700 mb-1">⚠ Important</p>
-            <p className="text-xs text-amber-600">Always consult a registered physician before taking any medicine. Self-medication can be harmful.</p>
-          </div>
+  // ==========================================
+  // LOAD REAL PHARMACY AVAILABILITY
+  // ==========================================
+
+  useEffect(() => {
+    if (!med) {
+      setAvailability([]);
+      return;
+    }
+
+    const loadAvailability = async () => {
+
+      try {
+
+        setLoading(true);
+
+        const response = await api.get(
+          `/medicines/availability/search?search=${encodeURIComponent(medicineName)}`
+        );
+
+        setAvailability(
+          response.data.results || []
+        );
+
+      } catch (error) {
+
+        console.error(
+          "Failed to load pharmacy availability:",
+          error
+        );
+
+        setAvailability([]);
+
+      } finally {
+
+        setLoading(false);
+
+      }
+
+    };
+
+    loadAvailability();
+
+  }, [medicineName]);
+
+
+  if (!med) {
+    return (
+      <div className="p-6">
+        <button
+          onClick={() => setPage("medicine-search")}
+          className="flex items-center gap-2 text-sm text-slate-500 hover:text-blue-600"
+        >
+          <ArrowLeft size={16} />
+          Back to Search
+        </button>
+
+        <div className="mt-6 bg-white rounded-2xl p-8 text-center shadow-sm border border-black/5">
+          <h2 className="text-lg font-bold text-slate-800">No medicine selected</h2>
+          <p className="text-sm text-slate-500 mt-2">Please select a medicine from the search page.</p>
         </div>
       </div>
+    );
+  }
+
+  const availablePharmacies = availability.filter(
+    (ph: any) => Number(ph.stock) > 0
+  );
+
+  const positivePrices = availablePharmacies
+    .map((ph: any) => Number(ph.price) || 0)
+    .filter((value: number) => value > 0);
+
+  const lowestPrice =
+    positivePrices.length > 0
+      ? Math.min(...positivePrices)
+      : Number(med.price) || 0;
+
+
+
+  // ==========================================
+  // OPEN RESERVATION MODAL
+  // ==========================================
+
+  const openReserveModal = (pharmacy: any) => {
+
+    setSelectedPharmacy(pharmacy);
+    setQuantity(1);
+    setShowReserveModal(true);
+
+  };
+
+
+  // ==========================================
+  // CREATE RESERVATION
+  // ==========================================
+
+  const handleReservation = async () => {
+
+    if (!selectedPharmacy) {
+      return;
+    }
+
+    if (quantity < 1) {
+      alert("Quantity must be at least 1.");
+      return;
+    }
+
+    if (quantity > selectedPharmacy.stock) {
+      alert(
+        `Only ${selectedPharmacy.stock} units are available.`
+      );
+      return;
+    }
+
+    try {
+
+      setReserving(true);
+
+      const response = await api.post(
+        "/reservations",
+        {
+          // TEMPORARY USER ID
+          // Later this will come from logged-in user.
+          user_id: 1,
+
+          pharmacy_id:
+            selectedPharmacy.pharmacy_id,
+
+          medicine_id:
+            selectedPharmacy.medicine_id,
+
+          quantity: quantity
+        }
+      );
+
+      if (response.data.success) {
+
+        alert(
+          `Reservation successful!\n\nReservation ID: ${response.data.reservation_id}`
+        );
+
+        setShowReserveModal(false);
+
+        setSelectedPharmacy(null);
+
+        setQuantity(1);
+
+      } else {
+
+        alert(
+          response.data.message ||
+          "Failed to create reservation."
+        );
+
+      }
+
+    } catch (error: any) {
+
+      console.error(
+        "Reservation error:",
+        error
+      );
+
+      alert(
+        error?.response?.data?.message ||
+        "Failed to create reservation."
+      );
+
+    } finally {
+
+      setReserving(false);
+
+    }
+
+  };
+
+
+  return (
+    <div className="p-6 space-y-5">
+
+      {/* ==========================================
+          BACK BUTTON
+      ========================================== */}
+
+      <button
+        onClick={() => setPage("medicine-search")}
+        className="flex items-center gap-2 text-sm text-slate-500 hover:text-blue-600 transition-colors"
+      >
+        <ArrowLeft size={16} />
+        Back to Search
+      </button>
+
+
+      <div className="grid grid-cols-3 gap-5">
+
+        {/* ==========================================
+            LEFT SIDE
+        ========================================== */}
+
+        <div className="col-span-2 space-y-5">
+
+          <div className="bg-white rounded-2xl p-6 shadow-sm border border-black/5">
+
+            <div className="flex items-start gap-6">
+
+              <div className="w-24 h-24 rounded-2xl bg-blue-50 flex items-center justify-center flex-shrink-0">
+
+                <Pill
+                  size={40}
+                  className="text-blue-400"
+                />
+
+              </div>
+
+
+              <div className="flex-1">
+
+                <div className="flex items-start justify-between">
+
+                  <div>
+
+                    <h1 className="text-2xl font-bold text-slate-800">
+                      {medicineName}
+                    </h1>
+
+                    <p className="text-slate-500">
+                      {genericName}
+                      {strength ? ` — ${strength}` : ""}
+                    </p>
+
+                    <p className="text-sm text-slate-400">
+                      {manufacturer}
+                      {manufacturer && category ? " · " : ""}
+                      {category}
+                    </p>
+                  </div>
+
+                  <Badge
+                    label="Available"
+                    variant="green"
+                  />
+
+                </div>
+
+
+                <div className="mt-4 flex items-center gap-4">
+
+                  <div className="text-center">
+
+                    <p className="text-xs text-slate-400">
+                      Lowest Price
+                    </p>
+
+                    <p className="text-2xl font-bold text-blue-600">
+                      ৳{Number(lowestPrice || 0).toFixed(2)}
+                    </p>
+
+                  </div>
+
+
+                  <div className="text-center">
+
+                    <p className="text-xs text-slate-400">
+                      Available At
+                    </p>
+
+                    <p className="text-2xl font-bold text-green-600">
+                      {availablePharmacies.length}
+                    </p>
+
+                    <p className="text-xs text-slate-400">
+                      Pharmacies
+                    </p>
+
+                  </div>
+
+                </div>
+
+
+                <div className="mt-4 flex gap-3">
+
+                  <button
+                    onClick={() =>
+                      setPage("price-comparison")
+                    }
+                    className="px-5 py-2.5 border border-blue-200 text-blue-600 rounded-xl text-sm font-semibold hover:bg-blue-50 transition-colors"
+                  >
+                    Compare Prices
+                  </button>
+
+
+                  <button
+                    onClick={() => {
+
+                      if (availability.length === 0) {
+
+                        alert(
+                          "This medicine is currently unavailable."
+                        );
+
+                        return;
+                      }
+
+                      openReserveModal(
+                        availability[0]
+                      );
+
+                    }}
+                    className="px-5 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition-colors"
+                  >
+                    Reserve Medicine
+                  </button>
+
+                </div>
+
+              </div>
+
+            </div>
+
+          </div>
+
+
+          {/* ==========================================
+              DESCRIPTION
+          ========================================== */}
+
+          {[
+            {
+              title: "Description",
+              content:
+                med?.description ||
+                `${medicineName} information is not available yet.`
+            },
+            {
+              title: "Uses",
+              content:
+                med?.uses ||
+                "Uses information is not available yet."
+            },
+            {
+              title: "Dosage",
+              content:
+                med?.dosage ||
+                "Dosage information is not available yet."
+            },
+            {
+              title: "Side Effects",
+              content:
+                med?.side_effects ||
+                "Side effects information is not available yet."
+            },
+          ].map((s) => (
+            <div
+              key={s.title}
+              className="bg-white rounded-2xl p-5 shadow-sm border border-black/5"
+            >
+              <h3 className="font-bold text-slate-800 mb-2">
+                {s.title}
+              </h3>
+
+              <p className="text-sm text-slate-600 leading-relaxed">
+                {s.content}
+              </p>
+            </div>
+          ))}
+
+          </div>
+
+        {/* ==========================================
+            AVAILABLE PHARMACIES
+        ========================================== */}
+
+        <div className="space-y-5">
+
+          <div className="bg-white rounded-2xl p-5 shadow-sm border border-black/5">
+
+            <h3 className="font-bold text-slate-800 mb-4">
+              Available Pharmacies
+            </h3>
+
+
+            {loading ? (
+
+              <p className="text-sm text-slate-400">
+                Loading pharmacies...
+              </p>
+
+            ) : availability.length === 0 ? (
+
+              <p className="text-sm text-slate-400">
+                No pharmacies currently have this medicine.
+              </p>
+
+            ) : (
+
+              <div className="space-y-4">
+
+                {availability.map(ph => (
+
+                  <div
+                    key={`${ph.pharmacy_id}-${ph.medicine_id}`}
+                    className="p-3 rounded-xl bg-slate-50 space-y-2"
+                  >
+
+                    <p className="text-sm font-semibold text-slate-800">
+                      {ph.pharmacy_name}
+                    </p>
+
+
+                    <p className="text-xs text-slate-400 flex items-center gap-1">
+
+                      <MapPin size={10} />
+
+                      {ph.address || "Address not available"}
+
+                    </p>
+
+
+                    <div className="flex items-center justify-between">
+
+                      <div>
+
+                        <p className="text-base font-bold text-blue-600">
+                          ৳{Number(ph.price).toFixed(2)}
+                        </p>
+
+                        <p className="text-xs text-slate-400">
+                          Stock: {ph.stock}
+                        </p>
+
+                      </div>
+
+
+                      <button
+                        onClick={() =>
+                          openReserveModal(ph)
+                        }
+                        disabled={ph.stock <= 0}
+                        className="text-xs px-3 py-1.5 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed"
+                      >
+                        Reserve
+                      </button>
+
+                    </div>
+
+                  </div>
+
+                ))}
+
+              </div>
+
+            )}
+
+          </div>
+
+
+          {/* WARNING */}
+
+          <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4">
+
+            <p className="text-xs font-semibold text-amber-700 mb-1">
+              ⚠ Important
+            </p>
+
+            <p className="text-xs text-amber-600">
+              Always consult a registered physician before taking any medicine.
+              Self-medication can be harmful.
+            </p>
+
+          </div>
+
+        </div>
+
+      </div>
+
+
+      {/* ==========================================
+          RESERVATION MODAL
+      ========================================== */}
+
+      {showReserveModal && selectedPharmacy && (
+
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+
+          <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-xl">
+
+            <div className="flex items-center justify-between mb-5">
+
+              <div>
+
+                <h2 className="text-xl font-bold text-slate-800">
+                  Reserve Medicine
+                </h2>
+
+                <p className="text-sm text-slate-400 mt-1">
+                  Confirm your reservation
+                </p>
+
+              </div>
+
+
+              <button
+                onClick={() =>
+                  setShowReserveModal(false)
+                }
+                className="text-slate-400 hover:text-slate-700 text-xl"
+              >
+                ×
+              </button>
+
+            </div>
+
+
+            {/* Medicine */}
+
+            <div className="bg-slate-50 rounded-xl p-4 mb-4">
+
+              <p className="text-sm font-semibold text-slate-800">
+                {selectedPharmacy.brand_name}
+              </p>
+
+              <p className="text-xs text-slate-500 mt-1">
+                {selectedPharmacy.generic_name ||
+                  "Generic name not available"}
+              </p>
+
+              <p className="text-xs text-slate-500">
+                {selectedPharmacy.strength}
+              </p>
+
+            </div>
+
+
+            {/* Pharmacy */}
+
+            <div className="mb-4">
+
+              <p className="text-xs text-slate-400">
+                Pharmacy
+              </p>
+
+              <p className="text-sm font-semibold text-slate-800">
+                {selectedPharmacy.pharmacy_name}
+              </p>
+
+              <p className="text-xs text-slate-500">
+                {selectedPharmacy.address}
+              </p>
+
+            </div>
+
+
+            {/* Price */}
+
+            <div className="flex justify-between mb-4">
+
+              <span className="text-sm text-slate-500">
+                Price per unit
+              </span>
+
+              <span className="text-sm font-bold text-blue-600">
+                ৳{Number(selectedPharmacy.price).toFixed(2)}
+              </span>
+
+            </div>
+
+
+            {/* Stock */}
+
+            <div className="flex justify-between mb-4">
+
+              <span className="text-sm text-slate-500">
+                Available stock
+              </span>
+
+              <span className="text-sm font-semibold text-green-600">
+                {selectedPharmacy.stock}
+              </span>
+
+            </div>
+
+
+            {/* Quantity */}
+
+            <div className="mb-5">
+
+              <label className="block text-sm font-semibold text-slate-700 mb-2">
+                Quantity
+              </label>
+
+              <div className="flex items-center gap-3">
+
+                <button
+                  onClick={() =>
+                    setQuantity(
+                      Math.max(1, quantity - 1)
+                    )
+                  }
+                  className="w-10 h-10 rounded-lg border border-slate-200 hover:bg-slate-50"
+                >
+                  −
+                </button>
+
+
+                <input
+                  type="number"
+                  min="1"
+                  max={selectedPharmacy.stock}
+                  value={quantity}
+                  onChange={e =>
+                    setQuantity(
+                      Math.max(
+                        1,
+                        Number(e.target.value)
+                      )
+                    )
+                  }
+                  className="flex-1 text-center border border-slate-200 rounded-lg h-10 outline-none"
+                />
+
+
+                <button
+                  onClick={() =>
+                    setQuantity(
+                      Math.min(
+                        selectedPharmacy.stock,
+                        quantity + 1
+                      )
+                    )
+                  }
+                  className="w-10 h-10 rounded-lg border border-slate-200 hover:bg-slate-50"
+                >
+                  +
+                </button>
+
+              </div>
+
+            </div>
+
+
+            {/* Total */}
+
+            <div className="flex items-center justify-between border-t border-slate-100 pt-4 mb-5">
+
+              <span className="font-semibold text-slate-700">
+                Total
+              </span>
+
+              <span className="text-xl font-bold text-blue-600">
+                ৳
+                {(
+                  Number(selectedPharmacy.price) *
+                  quantity
+                ).toFixed(2)}
+              </span>
+
+            </div>
+
+
+            {/* Buttons */}
+
+            <div className="flex gap-3">
+
+              <button
+                onClick={() => {
+                  setShowReserveModal(false);
+                  setSelectedPharmacy(null);
+                }}
+                className="flex-1 px-4 py-3 border border-slate-200 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+
+
+              <button
+                onClick={handleReservation}
+                disabled={reserving}
+                className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 disabled:bg-slate-300"
+              >
+                {reserving
+                  ? "Reserving..."
+                  : "Confirm Reservation"}
+              </button>
+
+            </div>
+
+          </div>
+
+        </div>
+
+      )}
+
     </div>
   );
 }
 
 function PriceComparisonPage({ setPage }: { setPage: (p: Page) => void }) {
+
+  const [medicine, setMedicine] = useState<any>(null);
+  const [pharmacies, setPharmacies] = useState<any[]>([]);
+
+
+  // ==========================================
+  // LOAD SELECTED MEDICINE
+  // ==========================================
+
+  useEffect(() => {
+
+    const savedMedicine = localStorage.getItem("selectedMedicine");
+
+    if (savedMedicine) {
+
+      try {
+
+        const parsedMedicine = JSON.parse(savedMedicine);
+
+        setMedicine(parsedMedicine);
+
+        setPharmacies(parsedMedicine.pharmacies || []);
+
+      } catch (error) {
+
+        console.error(
+          "Failed to load selected medicine",
+          error
+        );
+
+      }
+
+    }
+
+  }, []);
+
+
+  // ==========================================
+  // FIND LOWEST PRICE
+  // ==========================================
+
+  const availablePharmacies = pharmacies.filter(
+    (ph: any) => Number(ph.stock) > 0
+  );
+
+
+  const lowestPrice =
+    availablePharmacies.length > 0
+      ? Math.min(
+          ...availablePharmacies.map(
+            (ph: any) => Number(ph.price)
+          )
+        )
+      : 0;
+
+
+  // ==========================================
+  // NO MEDICINE SELECTED
+  // ==========================================
+
+  if (!medicine) {
+
+    return (
+      <div className="p-6">
+
+        <button
+          onClick={() => setPage("medicine-search")}
+          className="flex items-center gap-2 text-sm text-slate-500 hover:text-blue-600 mb-5"
+        >
+          <ArrowLeft size={16} />
+          Back to Search
+        </button>
+
+
+        <div className="bg-white rounded-2xl p-10 text-center shadow-sm border border-black/5">
+
+          <h2 className="text-lg font-bold text-slate-800">
+            No medicine selected
+          </h2>
+
+          <p className="text-sm text-slate-500 mt-2">
+            Please search for a medicine first.
+          </p>
+
+
+          <button
+            onClick={() => setPage("medicine-search")}
+            className="mt-5 px-5 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold"
+          >
+            Find Medicine
+          </button>
+
+        </div>
+
+      </div>
+    );
+
+  }
+
+
   return (
+
     <div className="p-6 space-y-5">
-      <button onClick={() => setPage("medicine-search")} className="flex items-center gap-2 text-sm text-slate-500 hover:text-blue-600 transition-colors">
-        <ArrowLeft size={16} /> Back
+
+      {/* BACK BUTTON */}
+
+      <button
+        onClick={() => setPage("medicine-search")}
+        className="flex items-center gap-2 text-sm text-slate-500 hover:text-blue-600 transition-colors"
+      >
+        <ArrowLeft size={16} />
+        Back to Search
       </button>
+
+
+      {/* HEADER */}
+
       <div>
-        <h1 className="text-2xl font-bold text-slate-800">Price Comparison</h1>
-        <p className="text-slate-500 text-sm mt-1">Napa Extra — Paracetamol+Caffeine 500mg+65mg</p>
+
+        <h1 className="text-2xl font-bold text-slate-800">
+          Price Comparison
+        </h1>
+
+        <p className="text-slate-500 text-sm mt-1">
+
+          {medicine.brand_name}
+
+          {medicine.generic_name &&
+            ` — ${medicine.generic_name}`}
+
+          {medicine.strength &&
+            ` ${medicine.strength}`}
+
+        </p>
+
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm border border-black/5 overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-          <p className="font-semibold text-slate-800">5 pharmacies found</p>
-          <button className="flex items-center gap-2 text-sm text-slate-500 hover:text-slate-700">
-            <RefreshCw size={14} /> Refresh
-          </button>
+
+      {/* MEDICINE SUMMARY */}
+
+      <div className="bg-white rounded-2xl p-5 shadow-sm border border-black/5">
+
+        <div className="flex items-center gap-4">
+
+          <div className="w-14 h-14 rounded-xl bg-blue-50 flex items-center justify-center">
+
+            <Pill
+              size={28}
+              className="text-blue-500"
+            />
+
+          </div>
+
+
+          <div>
+
+            <h2 className="font-bold text-slate-800">
+              {medicine.brand_name}
+            </h2>
+
+            <p className="text-sm text-slate-500">
+              {medicine.generic_name ||
+                "Generic name not available"}
+            </p>
+
+          </div>
+
+
+          <div className="ml-auto text-right">
+
+            <p className="text-xs text-slate-400">
+              Lowest Price
+            </p>
+
+            <p className="text-2xl font-bold text-blue-600">
+
+              {lowestPrice > 0
+                ? `৳${lowestPrice.toFixed(2)}`
+                : "N/A"}
+
+            </p>
+
+          </div>
+
         </div>
-        <table className="w-full">
-          <thead className="bg-slate-50 border-b border-slate-100">
-            <tr>
-              {["Pharmacy", "Location", "Distance", "Availability", "Price", "Actions"].map(h => (
-                <th key={h} className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-50">
-            {[
-              { ph: "Dhaka Medical Pharmacy", area: "Shahbag", dist: "0.4 km", avail: "Available", price: 35, stock: 45 },
-              { ph: "Popular Drug House", area: "Dhanmondi", dist: "0.8 km", avail: "Available", price: 37, stock: 28 },
-              { ph: "City Pharmacy", area: "Gulshan-1", dist: "1.2 km", avail: "Available", price: 35, stock: 12 },
-              { ph: "ABC Medicine Corner", area: "Mirpur-10", dist: "2.1 km", avail: "Out of Stock", price: 0, stock: 0 },
-              { ph: "Life Care Pharmacy", area: "Banani", dist: "3.0 km", avail: "Available", price: 38, stock: 60 },
-            ].map((row, i) => (
-              <tr key={i} className={`hover:bg-slate-50/50 transition-colors ${i === 0 ? "bg-green-50/30" : ""}`}>
-                <td className="px-6 py-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center">
-                      <Building2 size={14} className="text-green-600" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-slate-800">{row.ph}</p>
-                      {i === 0 && <span className="text-xs text-green-600 font-semibold">Lowest Price</span>}
-                    </div>
-                  </div>
-                </td>
-                <td className="px-6 py-4 text-sm text-slate-500">{row.area}</td>
-                <td className="px-6 py-4 text-sm text-slate-500">{row.dist}</td>
-                <td className="px-6 py-4">
-                  <Badge label={row.avail} variant={row.avail === "Available" ? "green" : "red"} />
-                </td>
-                <td className="px-6 py-4">
-                  {row.price > 0 ? <span className="text-lg font-bold text-blue-600">৳{row.price}</span> : <span className="text-slate-400">—</span>}
-                </td>
-                <td className="px-6 py-4">
-                  <div className="flex gap-2">
-                    {row.avail === "Available" && (
-                      <button className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded-lg font-semibold hover:bg-blue-700">Reserve</button>
-                    )}
-                    <button className="px-3 py-1.5 border border-slate-200 text-slate-600 text-xs rounded-lg font-semibold hover:bg-slate-50 flex items-center gap-1">
-                      <Navigation size={10} />Navigate
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+
       </div>
+
+
+      {/* PHARMACY TABLE */}
+
+      <div className="bg-white rounded-2xl shadow-sm border border-black/5 overflow-hidden">
+
+        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+
+          <p className="font-semibold text-slate-800">
+
+            {pharmacies.length}{" "}
+            {pharmacies.length === 1
+              ? "pharmacy"
+              : "pharmacies"}{" "}
+            found
+
+          </p>
+
+          <button
+            onClick={() => window.location.reload()}
+            className="flex items-center gap-2 text-sm text-slate-500 hover:text-slate-700"
+          >
+
+            <RefreshCw size={14} />
+
+            Refresh
+
+          </button>
+
+        </div>
+
+
+        {pharmacies.length === 0 ? (
+
+          <div className="p-10 text-center">
+
+            <Building2
+              size={40}
+              className="mx-auto text-slate-300 mb-3"
+            />
+
+            <h3 className="font-semibold text-slate-700">
+              No pharmacies found
+            </h3>
+
+            <p className="text-sm text-slate-400 mt-1">
+              This medicine is currently not listed by any pharmacy.
+            </p>
+
+          </div>
+
+        ) : (
+
+          <table className="w-full">
+
+            <thead className="bg-slate-50 border-b border-slate-100">
+
+              <tr>
+
+                {[
+                  "Pharmacy",
+                  "Location",
+                  "Phone",
+                  "Availability",
+                  "Stock",
+                  "Price",
+                  "Actions"
+                ].map((h) => (
+
+                  <th
+                    key={h}
+                    className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide"
+                  >
+                    {h}
+                  </th>
+
+                ))}
+
+              </tr>
+
+            </thead>
+
+
+            <tbody className="divide-y divide-slate-50">
+
+              {pharmacies
+                .sort(
+                  (a: any, b: any) =>
+                    Number(a.price) -
+                    Number(b.price)
+                )
+                .map((ph: any, index: number) => {
+
+                  const stock =
+                    Number(ph.stock) || 0;
+
+                  const price =
+                    Number(ph.price) || 0;
+
+                  const isAvailable =
+                    stock > 0;
+
+                  const isLowest =
+                    isAvailable &&
+                    price === lowestPrice;
+
+
+                  return (
+
+                    <tr
+                      key={`${ph.pharmacy_id}-${index}`}
+                      className={`hover:bg-slate-50/50 transition-colors ${
+                        isLowest
+                          ? "bg-green-50/40"
+                          : ""
+                      }`}
+                    >
+
+                      {/* PHARMACY */}
+
+                      <td className="px-6 py-4">
+
+                        <div className="flex items-center gap-3">
+
+                          <div className="w-9 h-9 rounded-lg bg-green-100 flex items-center justify-center">
+
+                            <Building2
+                              size={15}
+                              className="text-green-600"
+                            />
+
+                          </div>
+
+
+                          <div>
+
+                            <p className="text-sm font-semibold text-slate-800">
+
+                              {ph.pharmacy_name}
+
+                            </p>
+
+
+                            {isLowest && (
+
+                              <span className="text-xs text-green-600 font-semibold">
+
+                                Lowest Price
+
+                              </span>
+
+                            )}
+
+                          </div>
+
+                        </div>
+
+                      </td>
+
+
+                      {/* LOCATION */}
+
+                      <td className="px-6 py-4">
+
+                        <div className="flex items-center gap-1">
+
+                          <MapPin
+                            size={12}
+                            className="text-slate-400"
+                          />
+
+                          <span className="text-sm text-slate-500">
+
+                            {ph.address ||
+                              "Address not available"}
+
+                          </span>
+
+                        </div>
+
+                      </td>
+
+
+                      {/* PHONE */}
+
+                      <td className="px-6 py-4">
+
+                        <span className="text-sm text-slate-500">
+
+                          {ph.phone ||
+                            "Not available"}
+
+                        </span>
+
+                      </td>
+
+
+                      {/* AVAILABILITY */}
+
+                      <td className="px-6 py-4">
+
+                        <Badge
+                          label={
+                            isAvailable
+                              ? "Available"
+                              : "Out of Stock"
+                          }
+                          variant={
+                            isAvailable
+                              ? "green"
+                              : "red"
+                          }
+                        />
+
+                      </td>
+
+
+                      {/* STOCK */}
+
+                      <td className="px-6 py-4">
+
+                        <span
+                          className={`text-sm font-bold ${
+                            stock === 0
+                              ? "text-red-500"
+                              : stock < 15
+                              ? "text-amber-500"
+                              : "text-slate-800"
+                          }`}
+                        >
+
+                          {stock}
+
+                        </span>
+
+                      </td>
+
+
+                      {/* PRICE */}
+
+                      <td className="px-6 py-4">
+
+                        {price > 0 ? (
+
+                          <span className="text-lg font-bold text-blue-600">
+
+                            ৳{price.toFixed(2)}
+
+                          </span>
+
+                        ) : (
+
+                          <span className="text-slate-400">
+                            —
+                          </span>
+
+                        )}
+
+                      </td>
+
+
+                      {/* ACTIONS */}
+
+                      <td className="px-6 py-4">
+
+                        <div className="flex gap-2">
+
+                          {isAvailable && (
+
+                            <button
+                              onClick={() => {
+                                localStorage.setItem(
+                                  "selectedPharmacy",
+                                  JSON.stringify(ph)
+                                );
+
+                                setPage(
+                                  "medicine-details"
+                                );
+                              }}
+                              className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded-lg font-semibold hover:bg-blue-700"
+                            >
+                              Reserve
+                            </button>
+
+                          )}
+
+
+                          <button
+                            onClick={() => {
+
+                              if (
+                                ph.latitude &&
+                                ph.longitude
+                              ) {
+
+                                window.open(
+                                  `https://www.google.com/maps/dir/?api=1&destination=${ph.latitude},${ph.longitude}`,
+                                  "_blank"
+                                );
+
+                              } else {
+
+                                alert(
+                                  "Location coordinates are not available for this pharmacy."
+                                );
+
+                              }
+
+                            }}
+                            className="px-3 py-1.5 border border-slate-200 text-slate-600 text-xs rounded-lg font-semibold hover:bg-slate-50 flex items-center gap-1"
+                          >
+
+                            <Navigation size={10} />
+
+                            Navigate
+
+                          </button>
+
+                        </div>
+
+                      </td>
+
+                    </tr>
+
+                  );
+
+                })}
+
+            </tbody>
+
+          </table>
+
+        )}
+
+      </div>
+
     </div>
+
   );
+
 }
 
 function PharmacyLocatorPage() {
@@ -1297,132 +2639,790 @@ function PharmacyDashboard({ setPage }: { setPage: (p: Page) => void }) {
 
 function PharmacyInventory() {
     const [search, setSearch] = useState("");
+    const [statusFilter, setStatusFilter] = useState("All Status");
 
     const [inventory, setInventory] = useState<any[]>([]);
+    const [medicines, setMedicines] = useState<any[]>([]);
 
-    const filtered = inventory.filter(item =>
-        item.brand_name.toLowerCase().includes(search.toLowerCase()) ||
-        item.generic_name.toLowerCase().includes(search.toLowerCase())
-    );
+    const [showModal, setShowModal] = useState(false);
+    const [editingItem, setEditingItem] = useState<any>(null);
 
-    useEffect(() => {
+    const [form, setForm] = useState({
+        medicine_id: "",
+        stock: "",
+        price: ""
+    });
+
+    // TEMPORARY pharmacy ID
+    // Later this will come from the logged-in pharmacy account.
+    const PHARMACY_ID = 1;
+
+
+    // ==========================================
+    // LOAD PHARMACY INVENTORY
+    // ==========================================
+
+const loadInventory = async () => {
+
+    try {
+
+        console.log("Loading inventory...");
+
+        const response = await api.get(
+            `/inventory/pharmacy/${PHARMACY_ID}`
+        );
+
+        console.log("Inventory response:", response.data);
+
+        setInventory(
+            response.data.inventory || []
+        );
+
+    } catch (error) {
+
+        console.error(
+            "Inventory loading error:",
+            error
+        );
+
+    }
+
+};
+useEffect(() => {
+
     loadInventory();
-    }, []);
+    loadMedicines();
 
-    const loadInventory = async () => {
+}, []);
+
+
+    // ==========================================
+    // LOAD MEDICINES
+    // ==========================================
+
+    const loadMedicines = async () => {
 
         try {
 
-            const response = await fetch(
-                "http://localhost:5000/api/inventory"
+            const response = await api.get("/medicines");
+
+            setMedicines(
+                Array.isArray(response.data)
+                    ? response.data
+                    : []
             );
 
-            const data = await response.json();
+        } catch (error) {
 
-            setInventory(data);
-
-        } catch (err) {
-
-            console.log(err);
+            console.error(
+                "Failed to load medicines",
+                error
+            );
 
         }
 
     };
 
-  return (
-    <div className="p-6 space-y-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800">Medicine Inventory</h1>
-          <p className="text-slate-500 text-sm mt-1">Manage your pharmacy stock</p>
-        </div>
-        <div className="flex gap-3">
-          <button className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-600 rounded-xl text-sm font-semibold hover:bg-slate-50">
-            <Download size={16} />Export
-          </button>
-          <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700">
-            <Plus size={16} />Add Medicine
-          </button>
-        </div>
-      </div>
 
-      <div className="bg-white rounded-2xl shadow-sm border border-black/5 overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-4">
-          <div className="flex-1 flex items-center gap-3 px-4 py-2.5 rounded-xl border border-slate-200 focus-within:border-blue-400 transition-all">
-            <Search size={16} className="text-slate-400" />
-            <input value={search} onChange={e => setSearch(e.target.value)} className="flex-1 outline-none text-sm text-slate-700" placeholder="Search medicine..." />
-          </div>
-          <select className="px-4 py-2.5 rounded-xl border border-slate-200 text-sm bg-white">
-            <option>All Status</option>
-            <option>Available</option>
-            <option>Low Stock</option>
-            <option>Out of Stock</option>
-          </select>
-        </div>
-        <table className="w-full">
-          <thead className="bg-slate-50 border-b border-slate-100">
-            <tr>
-              {["Medicine", "Generic Name", "Current Stock", "Selling Price", "Status", "Actions"].map(h => (
-                <th key={h} className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-50">
-            {filtered.map(item => (
-              <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
-                <td className="px-6 py-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
-                      <Pill size={14} className="text-blue-400" />
+    // ==========================================
+    // LOAD DATA
+    // ==========================================
+
+    useEffect(() => {
+
+        loadInventory();
+        loadMedicines();
+
+    }, []);
+
+
+    // ==========================================
+    // FILTER INVENTORY
+    // ==========================================
+
+    const filtered = inventory.filter(item => {
+
+        const searchText = search.toLowerCase();
+
+        const matchesSearch =
+            String(item.brand_name || "")
+                .toLowerCase()
+                .includes(searchText) ||
+
+            String(item.generic_name || "")
+                .toLowerCase()
+                .includes(searchText);
+
+
+        const matchesStatus =
+            statusFilter === "All Status" ||
+
+            (
+                statusFilter === "Available" &&
+                item.stock >= 15
+            ) ||
+
+            (
+                statusFilter === "Low Stock" &&
+                item.stock > 0 &&
+                item.stock < 15
+            ) ||
+
+            (
+                statusFilter === "Out of Stock" &&
+                item.stock === 0
+            );
+
+
+        return matchesSearch && matchesStatus;
+
+    });
+
+
+    // ==========================================
+    // OPEN ADD MODAL
+    // ==========================================
+
+    const openAddModal = () => {
+
+        setEditingItem(null);
+
+        setForm({
+            medicine_id: "",
+            stock: "",
+            price: ""
+        });
+
+        setShowModal(true);
+
+    };
+
+
+    // ==========================================
+    // OPEN EDIT MODAL
+    // ==========================================
+
+    const openEditModal = (item: any) => {
+
+        setEditingItem(item);
+
+        setForm({
+            medicine_id: String(item.medicine_id),
+            stock: String(item.stock),
+            price: String(item.price)
+        });
+
+        setShowModal(true);
+
+    };
+
+
+    // ==========================================
+    // SAVE INVENTORY
+    // ==========================================
+
+    const saveInventory = async () => {
+
+        if (!form.medicine_id) {
+
+            alert("Please select a medicine.");
+
+            return;
+
+        }
+
+
+        if (
+            form.stock === "" ||
+            form.price === ""
+        ) {
+
+            alert("Please enter stock and price.");
+
+            return;
+
+        }
+
+
+        try {
+
+            if (editingItem) {
+
+                // UPDATE EXISTING INVENTORY
+
+                await api.put(
+                    `/inventory/${editingItem.id}`,
+                    {
+                        stock: Number(form.stock),
+                        price: Number(form.price)
+                    }
+                );
+
+                alert("Inventory updated successfully.");
+
+            } else {
+
+                // ADD NEW INVENTORY
+
+                await api.post(
+                    "/inventory",
+                    {
+                        pharmacy_id: PHARMACY_ID,
+                        medicine_id: Number(form.medicine_id),
+                        stock: Number(form.stock),
+                        price: Number(form.price)
+                    }
+                );
+
+                alert("Medicine added to inventory.");
+
+            }
+
+
+            setShowModal(false);
+
+            setEditingItem(null);
+
+            setForm({
+                medicine_id: "",
+                stock: "",
+                price: ""
+            });
+
+            await loadInventory();
+
+
+        } catch (error: any) {
+
+            console.error(
+                "Inventory save error:",
+                error
+            );
+
+
+            if (
+                error.response &&
+                error.response.status === 409
+            ) {
+
+                alert(
+                    "This medicine already exists in this pharmacy inventory."
+                );
+
+            } else {
+
+                alert(
+                    error.response?.data?.message ||
+                    "Failed to save inventory."
+                );
+
+            }
+
+        }
+
+    };
+
+
+    // ==========================================
+    // DELETE INVENTORY
+    // ==========================================
+
+    const deleteInventory = async (id: number) => {
+
+        const confirmed = window.confirm(
+            "Are you sure you want to remove this medicine from inventory?"
+        );
+
+
+        if (!confirmed) {
+            return;
+        }
+
+
+        try {
+
+            await api.delete(
+                `/inventory/${id}`
+            );
+
+            alert("Medicine removed from inventory.");
+
+            await loadInventory();
+
+        } catch (error: any) {
+
+            console.error(
+                "Delete inventory error:",
+                error
+            );
+
+            alert(
+                error.response?.data?.message ||
+                "Failed to delete inventory."
+            );
+
+        }
+
+    };
+
+
+    return (
+        <div className="p-6 space-y-5">
+
+            {/* ==========================================
+                HEADER
+            ========================================== */}
+
+            <div className="flex items-center justify-between">
+
+                <div>
+
+                    <h1 className="text-2xl font-bold text-slate-800">
+                        Medicine Inventory
+                    </h1>
+
+                    <p className="text-slate-500 text-sm mt-1">
+                        Manage your pharmacy stock
+                    </p>
+
+                </div>
+
+
+                <div className="flex gap-3">
+
+                    <button
+                        className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-600 rounded-xl text-sm font-semibold hover:bg-slate-50"
+                    >
+                        <Download size={16} />
+                        Export
+                    </button>
+
+
+                    <button
+                        onClick={openAddModal}
+                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700"
+                    >
+                        <Plus size={16} />
+                        Add Medicine
+                    </button>
+
+                </div>
+
+            </div>
+
+
+            {/* ==========================================
+                SEARCH + FILTER
+            ========================================== */}
+
+            <div className="bg-white rounded-2xl shadow-sm border border-black/5 overflow-hidden">
+
+                <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-4">
+
+                    <div className="flex-1 flex items-center gap-3 px-4 py-2.5 rounded-xl border border-slate-200 focus-within:border-blue-400 transition-all">
+
+                        <Search
+                            size={16}
+                            className="text-slate-400"
+                        />
+
+                        <input
+                            value={search}
+                            onChange={e =>
+                                setSearch(e.target.value)
+                            }
+                            className="flex-1 outline-none text-sm text-slate-700"
+                            placeholder="Search medicine..."
+                        />
+
                     </div>
-                    <p className="text-sm font-semibold text-slate-800">{item.brand_name}</p>
-                  </div>
-                </td>
-                <td className="px-6 py-4 text-sm text-slate-500">{item.generic_name}</td>
-                <td className="px-6 py-4">
-                  <span className={`text-sm font-bold ${item.stock === 0 ? "text-red-500" : item.stock < 15 ? "text-amber-500" : "text-slate-800"}`}>
-                    {item.stock}
-                  </span>
-                </td>
-                <td className="px-6 py-4 text-sm font-semibold text-blue-600">৳{item.price}</td>
-                <td className="px-6 py-4">
-                  <Badge
-                    label={
-                            item.stock === 0
-                                ? "Out of Stock"
-                                : item.stock < 15
-                                ? "Low Stock"
-                                : "Available"
+
+
+                    <select
+                        value={statusFilter}
+                        onChange={e =>
+                            setStatusFilter(e.target.value)
                         }
-                    variant={
-                              item.stock === 0
-                                  ? "red"
-                                  : item.stock < 15
-                                  ? "yellow"
-                                  : "green"
-                          }
-                  />
-                </td>
-                <td className="px-6 py-4">
-                  <div className="flex gap-2">
-                    <button className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600 transition-colors">
-                      <Edit2 size={14} />
-                    </button>
-                    <button className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600 transition-colors">
-                      <Eye size={14} />
-                    </button>
-                    <button className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors">
-                      Update Stock
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
+                        className="px-4 py-2.5 rounded-xl border border-slate-200 text-sm bg-white"
+                    >
+
+                        <option>All Status</option>
+                        <option>Available</option>
+                        <option>Low Stock</option>
+                        <option>Out of Stock</option>
+
+                    </select>
+
+                </div>
+
+
+                {/* ==========================================
+                    TABLE
+                ========================================== */}
+
+                <table className="w-full">
+
+                    <thead className="bg-slate-50 border-b border-slate-100">
+
+                        <tr>
+
+                            {[
+                                "Medicine",
+                                "Generic Name",
+                                "Current Stock",
+                                "Selling Price",
+                                "Status",
+                                "Actions"
+                            ].map(h => (
+
+                                <th
+                                    key={h}
+                                    className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide"
+                                >
+                                    {h}
+                                </th>
+
+                            ))}
+
+                        </tr>
+
+                    </thead>
+
+
+                    <tbody className="divide-y divide-slate-50">
+
+                        {filtered.length === 0 ? (
+
+                            <tr>
+
+                                <td
+                                    colSpan={6}
+                                    className="px-6 py-12 text-center text-sm text-slate-400"
+                                >
+                                    No inventory items found.
+                                </td>
+
+                            </tr>
+
+                        ) : (
+
+                            filtered.map(item => (
+
+                                <tr
+                                    key={item.id}
+                                    className="hover:bg-slate-50/50 transition-colors"
+                                >
+
+                                    {/* Medicine */}
+
+                                    <td className="px-6 py-4">
+
+                                        <div className="flex items-center gap-3">
+
+                                            <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
+
+                                                <Pill
+                                                    size={14}
+                                                    className="text-blue-400"
+                                                />
+
+                                            </div>
+
+                                            <p className="text-sm font-semibold text-slate-800">
+                                                {item.brand_name}
+                                            </p>
+
+                                        </div>
+
+                                    </td>
+
+
+                                    {/* Generic */}
+
+                                    <td className="px-6 py-4 text-sm text-slate-500">
+
+                                        {item.generic_name || "—"}
+
+                                    </td>
+
+
+                                    {/* Stock */}
+
+                                    <td className="px-6 py-4">
+
+                                        <span
+                                            className={`text-sm font-bold ${
+                                                item.stock === 0
+                                                    ? "text-red-500"
+                                                    : item.stock < 15
+                                                    ? "text-amber-500"
+                                                    : "text-slate-800"
+                                            }`}
+                                        >
+                                            {item.stock}
+                                        </span>
+
+                                    </td>
+
+
+                                    {/* Price */}
+
+                                    <td className="px-6 py-4 text-sm font-semibold text-blue-600">
+
+                                        ৳{Number(item.price).toFixed(2)}
+
+                                    </td>
+
+
+                                    {/* Status */}
+
+                                    <td className="px-6 py-4">
+
+                                        <Badge
+                                            label={
+                                                item.stock === 0
+                                                    ? "Out of Stock"
+                                                    : item.stock < 15
+                                                    ? "Low Stock"
+                                                    : "Available"
+                                            }
+                                            variant={
+                                                item.stock === 0
+                                                    ? "red"
+                                                    : item.stock < 15
+                                                    ? "yellow"
+                                                    : "green"
+                                            }
+                                        />
+
+                                    </td>
+
+
+                                    {/* Actions */}
+
+                                    <td className="px-6 py-4">
+
+                                        <div className="flex gap-2">
+
+                                            <button
+                                                onClick={() =>
+                                                    openEditModal(item)
+                                                }
+                                                className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600 transition-colors"
+                                                title="Edit"
+                                            >
+                                                <Edit2 size={14} />
+                                            </button>
+
+
+                                            <button
+                                                onClick={() =>
+                                                    openEditModal(item)
+                                                }
+                                                className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
+                                            >
+                                                Update Stock
+                                            </button>
+
+
+                                            <button
+                                                onClick={() =>
+                                                    deleteInventory(item.id)
+                                                }
+                                                className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
+                                            >
+                                                Delete
+                                            </button>
+
+                                        </div>
+
+                                    </td>
+
+                                </tr>
+
+                            ))
+
+                        )}
+
+                    </tbody>
+
+                </table>
+
+            </div>
+
+
+            {/* ==========================================
+                ADD / EDIT MODAL
+            ========================================== */}
+
+            {showModal && (
+
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+
+                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
+
+                        <div className="flex items-center justify-between mb-5">
+
+                            <div>
+
+                                <h2 className="text-lg font-bold text-slate-800">
+
+                                    {editingItem
+                                        ? "Edit Inventory"
+                                        : "Add Medicine to Inventory"}
+
+                                </h2>
+
+                                <p className="text-xs text-slate-400 mt-1">
+
+                                    {editingItem
+                                        ? "Update stock and selling price"
+                                        : "Add a medicine to your pharmacy"}
+
+                                </p>
+
+                            </div>
+
+
+                            <button
+                                onClick={() =>
+                                    setShowModal(false)
+                                }
+                                className="text-slate-400 hover:text-slate-700 text-xl"
+                            >
+                                ×
+                            </button>
+
+                        </div>
+
+
+                        {/* Medicine */}
+
+                        <div className="mb-4">
+
+                            <label className="block text-sm font-semibold text-slate-700 mb-2">
+                                Medicine
+                            </label>
+
+                            <select
+                                value={form.medicine_id}
+                                disabled={!!editingItem}
+                                onChange={e =>
+                                    setForm({
+                                        ...form,
+                                        medicine_id: e.target.value
+                                    })
+                                }
+                                className="w-full px-4 py-3 border border-slate-200 rounded-xl outline-none focus:border-blue-500 disabled:bg-slate-100"
+                            >
+
+                                <option value="">
+                                    Select Medicine
+                                </option>
+
+                                {medicines.map(medicine => (
+
+                                    <option
+                                        key={medicine.id}
+                                        value={medicine.id}
+                                    >
+                                        {medicine.brand_name}
+                                        {medicine.generic_name
+                                            ? ` - ${medicine.generic_name}`
+                                            : ""}
+                                    </option>
+
+                                ))}
+
+                            </select>
+
+                        </div>
+
+
+                        {/* Stock */}
+
+                        <div className="mb-4">
+
+                            <label className="block text-sm font-semibold text-slate-700 mb-2">
+                                Stock
+                            </label>
+
+                            <input
+                                type="number"
+                                min="0"
+                                value={form.stock}
+                                onChange={e =>
+                                    setForm({
+                                        ...form,
+                                        stock: e.target.value
+                                    })
+                                }
+                                placeholder="Enter stock quantity"
+                                className="w-full px-4 py-3 border border-slate-200 rounded-xl outline-none focus:border-blue-500"
+                            />
+
+                        </div>
+
+
+                        {/* Price */}
+
+                        <div className="mb-6">
+
+                            <label className="block text-sm font-semibold text-slate-700 mb-2">
+                                Selling Price (৳)
+                            </label>
+
+                            <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={form.price}
+                                onChange={e =>
+                                    setForm({
+                                        ...form,
+                                        price: e.target.value
+                                    })
+                                }
+                                placeholder="Enter selling price"
+                                className="w-full px-4 py-3 border border-slate-200 rounded-xl outline-none focus:border-blue-500"
+                            />
+
+                        </div>
+
+
+                        {/* Buttons */}
+
+                        <div className="flex gap-3">
+
+                            <button
+                                onClick={() =>
+                                    setShowModal(false)
+                                }
+                                className="flex-1 px-4 py-3 border border-slate-200 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-50"
+                            >
+                                Cancel
+                            </button>
+
+
+                            <button
+                                onClick={saveInventory}
+                                className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700"
+                            >
+                                {editingItem
+                                    ? "Save Changes"
+                                    : "Add Medicine"}
+                            </button>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            )}
+
+        </div>
+    );
 }
 
 function PharmacyReservations() {
@@ -2393,17 +4393,53 @@ export default function App() {
   const [page, setPage] = useState<Page>("home");
   const [panel, setPanel] = useState<Panel>("public");
 
+  const [selectedMedicine, setSelectedMedicine] = useState<any>(() => {
+    try {
+      const saved = localStorage.getItem("selectedMedicine");
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [selectedPharmacy, setSelectedPharmacy] = useState<any>(null);
+  const [showReservationModal, setShowReservationModal] = useState(false);
+
+  const openReservation = (medicine: any, pharmacy: any = null) => {
+  setSelectedMedicine(medicine);
+  setSelectedPharmacy(pharmacy);
+  setShowReservationModal(true);
+};
+
   const isPublic = panel === "public";
 
   const renderPage = () => {
     switch (page) {
-      case "home": return <HomePage setPage={setPage} setPanel={setPanel} />;
+      case "home":
+        return (
+          <HomePage
+            setPage={setPage}
+            setPanel={setPanel}
+            setSelectedMedicine={setSelectedMedicine}
+          />
+        );
       case "login": return <LoginPage setPage={setPage} setPanel={setPanel} />;
       case "register": return <RegisterPage setPage={setPage} />;
       case "forgot-password": return <ForgotPasswordPage setPage={setPage} />;
       case "user-dashboard": return <UserDashboard setPage={setPage} />;
-      case "medicine-search": return <MedicineSearchPage setPage={setPage} />;
-      case "medicine-details": return <MedicineDetailsPage setPage={setPage} />;
+      case "medicine-search":
+        return (
+          <MedicineSearchPage
+            setPage={setPage}
+            setSelectedMedicine={setSelectedMedicine}
+          />
+        );
+      case "medicine-details":
+        return (
+          <MedicineDetailsPage
+            setPage={setPage}
+            selectedMedicine={selectedMedicine}
+          />
+        );
       case "price-comparison": return <PriceComparisonPage setPage={setPage} />;
       case "pharmacy-locator": return <PharmacyLocatorPage />;
       case "pharmacy-dashboard": return <PharmacyDashboard setPage={setPage} />;
@@ -2415,7 +4451,14 @@ export default function App() {
       case "admin-medicine-management": return <AdminMedicineManagement />;
       case "reports": return <ReportsPage />;
       case "settings": return <SettingsPage />;
-      default: return <HomePage setPage={setPage} setPanel={setPanel} />;
+      default:
+        return (
+          <HomePage
+            setPage={setPage}
+            setPanel={setPanel}
+            setSelectedMedicine={setSelectedMedicine}
+          />
+        );
     }
   };
 
@@ -2426,6 +4469,116 @@ export default function App() {
       </div>
     );
   }
+const ReservationModal = () => {
+  if (!showReservationModal || !selectedMedicine) {
+    return null;
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-6">
+
+        <div className="flex items-center justify-between mb-5">
+          <div>
+            <h2 className="text-xl font-bold text-slate-800">
+              Reserve Medicine
+            </h2>
+
+            <p className="text-sm text-slate-500 mt-1">
+              Reserve your medicine from the pharmacy
+            </p>
+          </div>
+
+          <button
+            onClick={() => setShowReservationModal(false)}
+            className="text-slate-400 hover:text-slate-700 text-xl"
+          >
+            ×
+          </button>
+        </div>
+
+        <div className="bg-blue-50 rounded-xl p-4 mb-5">
+          <p className="font-bold text-slate-800">
+            {selectedMedicine.name ||
+              selectedMedicine.brand_name}
+          </p>
+
+          <p className="text-sm text-slate-500 mt-1">
+            {selectedMedicine.generic ||
+              selectedMedicine.generic_name ||
+              "Generic name not available"}
+          </p>
+
+          <p className="text-sm text-slate-500">
+            {selectedMedicine.strength || ""}
+          </p>
+        </div>
+
+        {selectedPharmacy && (
+          <div className="mb-5">
+            <label className="block text-sm font-semibold text-slate-700 mb-2">
+              Pharmacy
+            </label>
+
+            <div className="border border-slate-200 rounded-xl p-3">
+              <p className="font-semibold text-slate-800">
+                {selectedPharmacy.pharmacy_name ||
+                  selectedPharmacy.name}
+              </p>
+
+              <p className="text-xs text-slate-500 mt-1">
+                {selectedPharmacy.address ||
+                  selectedPharmacy.area ||
+                  "Address unavailable"}
+              </p>
+
+              {selectedPharmacy.price && (
+                <p className="text-sm font-bold text-blue-600 mt-2">
+                  ৳{selectedPharmacy.price}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
+        <div className="mb-5">
+          <label className="block text-sm font-semibold text-slate-700 mb-2">
+            Quantity
+          </label>
+
+          <input
+            type="number"
+            min="1"
+            defaultValue="1"
+            className="w-full border border-slate-200 rounded-xl px-4 py-3 outline-none focus:border-blue-500"
+          />
+        </div>
+
+        <div className="flex gap-3">
+
+          <button
+            onClick={() => setShowReservationModal(false)}
+            className="flex-1 px-4 py-3 border border-slate-200 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-50"
+          >
+            Cancel
+          </button>
+
+          <button
+            onClick={() => {
+              alert("Medicine reserved successfully!");
+              setShowReservationModal(false);
+            }}
+            className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700"
+          >
+            Confirm Reservation
+          </button>
+
+        </div>
+
+      </div>
+    </div>
+  );
+};
 
   return (
     <div style={{ fontFamily: "'Poppins', sans-serif" }} className="flex h-screen bg-background overflow-hidden">
@@ -2436,6 +4589,7 @@ export default function App() {
           {renderPage()}
         </main>
       </div>
+      <ReservationModal />
     </div>
   );
 }

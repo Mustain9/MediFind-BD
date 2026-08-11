@@ -1,3 +1,5 @@
+const pharmacyRoutes = require("./routes/pharmacyRoutes");
+const reservationRoutes = require("./routes/reservationRoutes");
 const categoryRoutes = require("./routes/categoryRoutes");
 const medicineRoutes = require("./routes/medicineRoutes");
 const express = require("express");
@@ -28,6 +30,8 @@ app.use(express.json());
 app.use("/api/medicines", medicineRoutes);
 app.use("/api/categories", categoryRoutes);
 app.use("/api/inventory", inventoryRoutes);
+app.use("/api/pharmacies", pharmacyRoutes);
+app.use("/api/reservations", reservationRoutes);
 
 // Routes
 app.get("/", (req, res) => {
