@@ -14,11 +14,21 @@ import {
 
 type Page =
   | "home" | "login" | "register" | "forgot-password"
-  | "user-dashboard" | "medicine-search" | "medicine-details"
-  | "price-comparison" | "pharmacy-locator"
-  | "pharmacy-dashboard" | "pharmacy-inventory" | "pharmacy-reservations" | "pharmacy-profile"
-  | "admin-dashboard" | "admin-pharmacy-approval" | "admin-medicine-management"
-  | "reports" | "settings";
+  | "user-dashboard"
+  | "medicine-search"
+  | "medicine-details"
+  | "my-reservations"
+  | "price-comparison"
+  | "pharmacy-locator"
+  | "pharmacy-dashboard"
+  | "pharmacy-inventory"
+  | "pharmacy-reservations"
+  | "pharmacy-profile"
+  | "admin-dashboard"
+  | "admin-pharmacy-approval"
+  | "admin-medicine-management"
+  | "reports"
+  | "settings";
 
 type Panel = "public" | "user" | "pharmacy" | "admin";
 
@@ -153,7 +163,7 @@ function Sidebar({ panel, page, setPage, setPanel }: { panel: Panel; page: Page;
     { icon: Home, label: "Dashboard", page: "user-dashboard" as Page },
     { icon: Search, label: "Find Medicine", page: "medicine-search" as Page },
     { icon: MapPin, label: "Pharmacy Locator", page: "pharmacy-locator" as Page },
-    { icon: ShoppingBag, label: "My Reservations", page: "medicine-details" as Page },
+    { icon: ShoppingBag, label: "My Reservations", page: "my-reservations" as Page },
     { icon: Settings, label: "Settings", page: "settings" as Page },
   ];
   const pharmacyLinks = [
@@ -853,18 +863,24 @@ function UserDashboard({ setPage }: { setPage: (p: Page) => void }) {
 
         {/* Reserved medicines */}
         <div className="bg-white rounded-2xl p-5 shadow-sm border border-black/5">
-          <h3 className="font-bold text-slate-800 mb-4">My Reservations</h3>
-          <div className="space-y-3">
-            {[].map(r => (
-              <div key={r.med} className="p-3 rounded-xl bg-slate-50 flex items-start justify-between">
-                <div>
-                  <p className="text-sm font-semibold text-slate-800">{r.med}</p>
-                  <p className="text-xs text-slate-400">{r.ph}</p>
-                </div>
-                <Badge label={r.status} variant={r.status === "Approved" ? "green" : "yellow"} />
-              </div>
-            ))}
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-bold text-slate-800">My Reservations</h3>
+            <button
+              onClick={() => setPage("my-reservations")}
+              className="text-xs text-blue-600 hover:underline"
+            >
+              View All
+            </button>
           </div>
+          <p className="text-sm text-slate-500">
+            View your active reservations and their approval status.
+          </p>
+          <button
+            onClick={() => setPage("my-reservations")}
+            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-semibold"
+          >
+            Open My Reservations
+          </button>
         </div>
       </div>
 
@@ -1249,9 +1265,18 @@ function MedicineDetailsPage({
 }) {
   const [availability, setAvailability] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [selectedPharmacy, setSelectedPharmacy] = useState<any>(null);
+  const [selectedPharmacy, setSelectedPharmacy] = useState<any>(() => {
+    try {
+      const saved = localStorage.getItem("selectedPharmacy");
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
   const [quantity, setQuantity] = useState(1);
-  const [showReserveModal, setShowReserveModal] = useState(false);
+  const [showReserveModal, setShowReserveModal] = useState(() => {
+    return Boolean(localStorage.getItem("selectedPharmacy"));
+  });
   const [reserving, setReserving] = useState(false);
 
   const med = selectedMedicine;
@@ -1387,9 +1412,14 @@ function MedicineDetailsPage({
       const response = await api.post(
         "/reservations",
         {
-          // TEMPORARY USER ID
-          // Later this will come from logged-in user.
-          user_id: 1,
+          user_id: (() => {
+            try {
+              const user = JSON.parse(localStorage.getItem("user") || "{}");
+              return Number(user.id || user.user_id || 1);
+            } catch {
+              return 1;
+            }
+          })(),
 
           pharmacy_id:
             selectedPharmacy.pharmacy_id,
@@ -1410,6 +1440,7 @@ function MedicineDetailsPage({
         setShowReserveModal(false);
 
         setSelectedPharmacy(null);
+        localStorage.removeItem("selectedPharmacy");
 
         setQuantity(1);
 
@@ -2422,6 +2453,11 @@ function PriceComparisonPage({ setPage }: { setPage: (p: Page) => void }) {
                             <button
                               onClick={() => {
                                 localStorage.setItem(
+                                  "selectedMedicine",
+                                  JSON.stringify(medicine)
+                                );
+
+                                localStorage.setItem(
                                   "selectedPharmacy",
                                   JSON.stringify(ph)
                                 );
@@ -3425,78 +3461,461 @@ useEffect(() => {
     );
 }
 
-function PharmacyReservations() {
-  const [tab, setTab] = useState("Pending");
-  const tabs = ["Pending", "Approved", "Completed", "Rejected"];
-  const filtered = RESERVATIONS.filter(r => r.status === tab);
+function MyReservationsPage({
+  setPage
+}: {
+  setPage: (p: Page) => void;
+}) {
+  const [reservations, setReservations] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // TEMPORARY USER ID
+  // Later this will come from the logged-in account.
+  const USER_ID = 1;
+
+  const loadReservations = async () => {
+    try {
+      setLoading(true);
+
+      const response = await api.get(
+        `/reservations/user/${USER_ID}`
+      );
+
+      if (response.data.success) {
+        setReservations(response.data.reservations || []);
+      } else {
+        setReservations([]);
+      }
+    } catch (error) {
+      console.error(
+        "Failed to load reservations:",
+        error
+      );
+
+      setReservations([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadReservations();
+  }, []);
+
+  const getStatusStyle = (status: string) => {
+    switch (String(status).toLowerCase()) {
+      case "pending":
+        return "bg-yellow-50 text-yellow-700";
+
+      case "approved":
+        return "bg-green-50 text-green-700";
+
+      case "completed":
+        return "bg-blue-50 text-blue-700";
+
+      case "cancelled":
+        return "bg-red-50 text-red-700";
+
+      default:
+        return "bg-slate-50 text-slate-600";
+    }
+  };
+
   return (
     <div className="p-6 space-y-5">
+
+      {/* HEADER */}
       <div>
-        <h1 className="text-2xl font-bold text-slate-800">Reservation Management</h1>
-        <p className="text-slate-500 text-sm mt-1">Manage medicine reservations from patients</p>
+        <h1 className="text-2xl font-bold text-slate-800">
+          My Reservations
+        </h1>
+
+        <p className="text-slate-500 text-sm mt-1">
+          View and manage your medicine reservations
+        </p>
       </div>
+
+      {/* LOADING */}
+      {loading && (
+        <div className="bg-white rounded-2xl p-10 text-center shadow-sm border border-black/5">
+          <div className="inline-block w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-3" />
+
+          <p className="text-sm text-slate-500">
+            Loading your reservations...
+          </p>
+        </div>
+      )}
+
+      {/* EMPTY */}
+      {!loading && reservations.length === 0 && (
+        <div className="bg-white rounded-2xl p-10 text-center shadow-sm border border-black/5">
+
+          <ShoppingBag
+            size={42}
+            className="mx-auto text-slate-300 mb-4"
+          />
+
+          <h3 className="font-semibold text-slate-700">
+            No reservations yet
+          </h3>
+
+          <p className="text-sm text-slate-400 mt-1">
+            Your medicine reservations will appear here.
+          </p>
+
+          <button
+            onClick={() => setPage("medicine-search")}
+            className="mt-5 px-5 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700"
+          >
+            Find Medicine
+          </button>
+
+        </div>
+      )}
+
+      {/* RESERVATIONS */}
+      {!loading && reservations.length > 0 && (
+        <div className="space-y-4">
+
+          {reservations.map((reservation) => (
+
+            <div
+              key={reservation.id}
+              className="bg-white rounded-2xl p-5 shadow-sm border border-black/5"
+            >
+
+              <div className="flex items-start justify-between gap-4">
+
+                <div className="flex items-start gap-4">
+
+                  <div className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center">
+                    <Pill
+                      size={24}
+                      className="text-blue-500"
+                    />
+                  </div>
+
+                  <div>
+
+                    <h3 className="font-bold text-slate-800">
+                      {reservation.brand_name}
+                    </h3>
+
+                    <p className="text-sm text-slate-500">
+                      {reservation.generic_name ||
+                        "Generic name not available"}
+                    </p>
+
+                    {reservation.strength && (
+                      <p className="text-xs text-slate-400 mt-1">
+                        {reservation.strength}
+                      </p>
+                    )}
+
+                  </div>
+
+                </div>
+
+                <span
+                  className={`px-3 py-1.5 rounded-full text-xs font-semibold capitalize ${getStatusStyle(
+                    reservation.status
+                  )}`}
+                >
+                  {reservation.status}
+                </span>
+
+              </div>
+
+
+              {/* DETAILS */}
+              <div className="grid grid-cols-4 gap-4 mt-5 pt-4 border-t border-slate-100">
+
+                <div>
+                  <p className="text-xs text-slate-400">
+                    Pharmacy
+                  </p>
+
+                  <p className="text-sm font-semibold text-slate-700 mt-1">
+                    {reservation.pharmacy_name}
+                  </p>
+                </div>
+
+
+                <div>
+                  <p className="text-xs text-slate-400">
+                    Quantity
+                  </p>
+
+                  <p className="text-sm font-semibold text-slate-700 mt-1">
+                    {reservation.quantity}
+                  </p>
+                </div>
+
+
+                <div>
+                  <p className="text-xs text-slate-400">
+                    Price
+                  </p>
+
+                  <p className="text-sm font-semibold text-blue-600 mt-1">
+                    ৳
+                    {Number(
+                      reservation.price || 0
+                    ).toFixed(2)}
+                  </p>
+                </div>
+
+
+                <div>
+                  <p className="text-xs text-slate-400">
+                    Reservation ID
+                  </p>
+
+                  <p className="text-sm font-semibold text-slate-700 mt-1">
+                    #{reservation.id}
+                  </p>
+                </div>
+
+              </div>
+
+
+              {/* DATE */}
+              {reservation.created_at && (
+                <p className="text-xs text-slate-400 mt-4">
+                  Reserved on{" "}
+                  {new Date(
+                    reservation.created_at
+                  ).toLocaleString()}
+                </p>
+              )}
+
+            </div>
+
+          ))}
+
+        </div>
+      )}
+
+    </div>
+  );
+}
+
+function PharmacyReservations() {
+  const PHARMACY_ID = 1; // temporary until pharmacy login is connected
+
+  const [tab, setTab] = useState("Pending");
+  const [reservations, setReservations] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const tabs = ["Pending", "Approved", "Completed", "Rejected"];
+
+  const loadReservations = async () => {
+    try {
+      setLoading(true);
+      const response = await api.get(`/reservations/pharmacy/${PHARMACY_ID}`);
+      setReservations(response.data.reservations || []);
+    } catch (error: any) {
+      console.error("Failed to load pharmacy reservations:", error);
+      alert(error?.response?.data?.message || "Failed to load reservations.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadReservations();
+  }, []);
+
+  const updateStatus = async (id: number, status: string) => {
+    try {
+      await api.patch(`/reservations/${id}/status`, {
+        status,
+        pharmacy_id: PHARMACY_ID,
+      });
+
+      alert(`Reservation ${status}.`);
+      await loadReservations();
+    } catch (error: any) {
+      console.error("Reservation status error:", error);
+      alert(
+        error?.response?.data?.message ||
+        "Failed to update reservation."
+      );
+    }
+  };
+
+  const filtered = reservations.filter(
+    r => String(r.status || "").toLowerCase() === tab.toLowerCase()
+  );
+
+  const statusVariant = (status: string) => {
+    switch (String(status).toLowerCase()) {
+      case "approved":
+        return "blue";
+      case "completed":
+        return "green";
+      case "rejected":
+      case "cancelled":
+        return "red";
+      default:
+        return "yellow";
+    }
+  };
+
+  return (
+    <div className="p-6 space-y-5">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-800">
+            Reservation Management
+          </h1>
+          <p className="text-slate-500 text-sm mt-1">
+            Manage medicine reservations from patients
+          </p>
+        </div>
+
+        <button
+          onClick={loadReservations}
+          className="flex items-center gap-2 px-4 py-2 border border-slate-200 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-50"
+        >
+          <RefreshCw size={15} />
+          Refresh
+        </button>
+      </div>
+
       <div className="flex gap-2">
         {tabs.map(t => (
           <button
             key={t}
             onClick={() => setTab(t)}
-            className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition-all ${tab === t ? "bg-blue-600 text-white shadow-sm" : "bg-white text-slate-600 border border-black/5 hover:bg-slate-50"}`}
-          >{t}</button>
+            className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+              tab === t
+                ? "bg-blue-600 text-white shadow-sm"
+                : "bg-white text-slate-600 border border-black/5 hover:bg-slate-50"
+            }`}
+          >
+            {t}
+          </button>
         ))}
       </div>
+
       <div className="bg-white rounded-2xl shadow-sm border border-black/5 overflow-hidden">
-        <table className="w-full">
-          <thead className="bg-slate-50 border-b border-slate-100">
-            <tr>
-              {["ID", "Patient", "Medicine", "Qty", "Date", "Status", "Actions"].map(h => (
-                <th key={h} className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-50">
-            {(filtered.length > 0 ? filtered : RESERVATIONS).map(r => (
-              <tr key={r.id} className="hover:bg-slate-50/50 transition-colors">
-                <td className="px-6 py-4 text-xs font-mono text-slate-400">{r.id}</td>
-                <td className="px-6 py-4 text-sm font-semibold text-slate-800">{r.patient}</td>
-                <td className="px-6 py-4 text-sm text-slate-600">{r.medicine}</td>
-                <td className="px-6 py-4 text-sm text-slate-600">{r.qty}</td>
-                <td className="px-6 py-4 text-sm text-slate-500">{r.date}</td>
-                <td className="px-6 py-4">
-                  <Badge label={r.status} variant={r.status === "Pending" ? "yellow" : r.status === "Approved" ? "blue" : r.status === "Completed" ? "green" : "red"} />
-                </td>
-                <td className="px-6 py-4">
-                  <div className="flex gap-2">
-                    {r.status === "Pending" && (
-                      <>
-                        <button className="px-3 py-1.5 bg-green-600 text-white text-xs rounded-lg font-semibold hover:bg-green-700 flex items-center gap-1">
-                          <CheckCircle size={12} />Approve
-                        </button>
-                        <button className="px-3 py-1.5 bg-red-100 text-red-600 text-xs rounded-lg font-semibold hover:bg-red-200 flex items-center gap-1">
-                          <XCircle size={12} />Reject
-                        </button>
-                      </>
-                    )}
-                    {r.status !== "Pending" && (
-                      <button className="px-3 py-1.5 border border-slate-200 text-slate-600 text-xs rounded-lg font-semibold hover:bg-slate-50 flex items-center gap-1">
-                        <Eye size={12} />View
-                      </button>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {filtered.length === 0 && (
-          <div className="text-center py-12 text-slate-400">
-            <ShoppingBag size={32} className="mx-auto mb-3 opacity-30" />
-            <p className="text-sm">No {tab.toLowerCase()} reservations</p>
+        {loading ? (
+          <div className="p-10 text-center text-sm text-slate-500">
+            Loading reservations...
           </div>
+        ) : (
+          <>
+            <table className="w-full">
+              <thead className="bg-slate-50 border-b border-slate-100">
+                <tr>
+                  {["ID", "Patient", "Medicine", "Qty", "Price", "Date", "Status", "Actions"].map(h => (
+                    <th
+                      key={h}
+                      className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide"
+                    >
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+
+              <tbody className="divide-y divide-slate-50">
+                {filtered.map(r => (
+                  <tr key={r.id} className="hover:bg-slate-50/50">
+                    <td className="px-6 py-4 text-xs font-mono text-slate-400">
+                      #{r.id}
+                    </td>
+
+                    <td className="px-6 py-4">
+                      <p className="text-sm font-semibold text-slate-800">
+                        {r.full_name || r.email || `User ${r.user_id}`}
+                      </p>
+                    </td>
+
+                    <td className="px-6 py-4">
+                      <p className="text-sm font-semibold text-slate-700">
+                        {r.brand_name}
+                      </p>
+                      <p className="text-xs text-slate-400">
+                        {r.generic_name || ""}
+                      </p>
+                    </td>
+
+                    <td className="px-6 py-4 text-sm font-semibold">
+                      {r.quantity}
+                    </td>
+
+                    <td className="px-6 py-4 text-sm font-semibold text-blue-600">
+                      {r.price != null
+                        ? `৳${Number(r.price).toFixed(2)}`
+                        : "—"}
+                    </td>
+
+                    <td className="px-6 py-4 text-sm text-slate-500">
+                      {r.created_at
+                        ? new Date(r.created_at).toLocaleString()
+                        : "—"}
+                    </td>
+
+                    <td className="px-6 py-4">
+                      <Badge
+                        label={String(r.status || "pending").replace(/^./, c => c.toUpperCase())}
+                        variant={statusVariant(r.status)}
+                      />
+                    </td>
+
+                    <td className="px-6 py-4">
+                      {String(r.status).toLowerCase() === "pending" ? (
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => updateStatus(r.id, "approved")}
+                            className="px-3 py-1.5 bg-green-600 text-white text-xs rounded-lg font-semibold hover:bg-green-700 flex items-center gap-1"
+                          >
+                            <CheckCircle size={12} />
+                            Approve
+                          </button>
+
+                          <button
+                            onClick={() => updateStatus(r.id, "rejected")}
+                            className="px-3 py-1.5 bg-red-100 text-red-600 text-xs rounded-lg font-semibold hover:bg-red-200 flex items-center gap-1"
+                          >
+                            <XCircle size={12} />
+                            Reject
+                          </button>
+                        </div>
+                      ) : String(r.status).toLowerCase() === "approved" ? (
+                        <button
+                          onClick={() => updateStatus(r.id, "completed")}
+                          className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded-lg font-semibold hover:bg-blue-700"
+                        >
+                          Mark Completed
+                        </button>
+                      ) : (
+                        <span className="text-xs text-slate-400">
+                          No action
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            {filtered.length === 0 && (
+              <div className="text-center py-12 text-slate-400">
+                <ShoppingBag size={32} className="mx-auto mb-3 opacity-30" />
+                <p className="text-sm">
+                  No {tab.toLowerCase()} reservations
+                </p>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
   );
 }
+
 
 function PharmacyProfile() {
   return (
@@ -4401,15 +4820,6 @@ export default function App() {
       return null;
     }
   });
-  const [selectedPharmacy, setSelectedPharmacy] = useState<any>(null);
-  const [showReservationModal, setShowReservationModal] = useState(false);
-
-  const openReservation = (medicine: any, pharmacy: any = null) => {
-  setSelectedMedicine(medicine);
-  setSelectedPharmacy(pharmacy);
-  setShowReservationModal(true);
-};
-
   const isPublic = panel === "public";
 
   const renderPage = () => {
@@ -4433,13 +4843,20 @@ export default function App() {
             setSelectedMedicine={setSelectedMedicine}
           />
         );
-      case "medicine-details":
-        return (
-          <MedicineDetailsPage
-            setPage={setPage}
-            selectedMedicine={selectedMedicine}
-          />
-        );
+        case "medicine-details":
+          return (
+            <MedicineDetailsPage
+              setPage={setPage}
+              selectedMedicine={selectedMedicine}
+            />
+          );
+
+        case "my-reservations":
+          return (
+            <MyReservationsPage
+              setPage={setPage}
+            />
+          );
       case "price-comparison": return <PriceComparisonPage setPage={setPage} />;
       case "pharmacy-locator": return <PharmacyLocatorPage />;
       case "pharmacy-dashboard": return <PharmacyDashboard setPage={setPage} />;
@@ -4469,116 +4886,6 @@ export default function App() {
       </div>
     );
   }
-const ReservationModal = () => {
-  if (!showReservationModal || !selectedMedicine) {
-    return null;
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-6">
-
-        <div className="flex items-center justify-between mb-5">
-          <div>
-            <h2 className="text-xl font-bold text-slate-800">
-              Reserve Medicine
-            </h2>
-
-            <p className="text-sm text-slate-500 mt-1">
-              Reserve your medicine from the pharmacy
-            </p>
-          </div>
-
-          <button
-            onClick={() => setShowReservationModal(false)}
-            className="text-slate-400 hover:text-slate-700 text-xl"
-          >
-            ×
-          </button>
-        </div>
-
-        <div className="bg-blue-50 rounded-xl p-4 mb-5">
-          <p className="font-bold text-slate-800">
-            {selectedMedicine.name ||
-              selectedMedicine.brand_name}
-          </p>
-
-          <p className="text-sm text-slate-500 mt-1">
-            {selectedMedicine.generic ||
-              selectedMedicine.generic_name ||
-              "Generic name not available"}
-          </p>
-
-          <p className="text-sm text-slate-500">
-            {selectedMedicine.strength || ""}
-          </p>
-        </div>
-
-        {selectedPharmacy && (
-          <div className="mb-5">
-            <label className="block text-sm font-semibold text-slate-700 mb-2">
-              Pharmacy
-            </label>
-
-            <div className="border border-slate-200 rounded-xl p-3">
-              <p className="font-semibold text-slate-800">
-                {selectedPharmacy.pharmacy_name ||
-                  selectedPharmacy.name}
-              </p>
-
-              <p className="text-xs text-slate-500 mt-1">
-                {selectedPharmacy.address ||
-                  selectedPharmacy.area ||
-                  "Address unavailable"}
-              </p>
-
-              {selectedPharmacy.price && (
-                <p className="text-sm font-bold text-blue-600 mt-2">
-                  ৳{selectedPharmacy.price}
-                </p>
-              )}
-            </div>
-          </div>
-        )}
-
-        <div className="mb-5">
-          <label className="block text-sm font-semibold text-slate-700 mb-2">
-            Quantity
-          </label>
-
-          <input
-            type="number"
-            min="1"
-            defaultValue="1"
-            className="w-full border border-slate-200 rounded-xl px-4 py-3 outline-none focus:border-blue-500"
-          />
-        </div>
-
-        <div className="flex gap-3">
-
-          <button
-            onClick={() => setShowReservationModal(false)}
-            className="flex-1 px-4 py-3 border border-slate-200 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-50"
-          >
-            Cancel
-          </button>
-
-          <button
-            onClick={() => {
-              alert("Medicine reserved successfully!");
-              setShowReservationModal(false);
-            }}
-            className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700"
-          >
-            Confirm Reservation
-          </button>
-
-        </div>
-
-      </div>
-    </div>
-  );
-};
 
   return (
     <div style={{ fontFamily: "'Poppins', sans-serif" }} className="flex h-screen bg-background overflow-hidden">
@@ -4589,7 +4896,6 @@ const ReservationModal = () => {
           {renderPage()}
         </main>
       </div>
-      <ReservationModal />
     </div>
   );
 }
