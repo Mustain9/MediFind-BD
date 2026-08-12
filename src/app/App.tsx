@@ -1090,359 +1090,679 @@ function UserDashboard({ setPage }: { setPage: (p: Page) => void }) {
     </div>
   );
 }
-
 function MedicineSearchPage({
-  setPage,
-  setSelectedMedicine
+    setPage,
+    setSelectedMedicine
 }: {
-  setPage: (p: Page) => void;
-  setSelectedMedicine: (medicine: any) => void;
+    setPage: (p: Page) => void;
+    setSelectedMedicine: (medicine: any) => void;
 }) {
-  const [medicines, setMedicines] = useState<any[]>([]);
-  const [search, setSearch] = useState("");
-  const [loading, setLoading] = useState(false);
 
-  // ==========================================
-  // LOAD MEDICINE AVAILABILITY
-  // ==========================================
-
-  const loadMedicines = async (searchText = "") => {
-    try {
-      setLoading(true);
-
-      const response = await fetch(
-        `http://localhost:5000/api/medicines/availability/search?search=${encodeURIComponent(searchText)}`
-      );
-
-      const data = await response.json();
-
-      if (!data.success) {
-        console.error("Failed to load medicines");
-        setMedicines([]);
-        return;
-      }
-
-      // ==========================================
-      // GROUP PHARMACY RESULTS BY MEDICINE
-      // ==========================================
-
-      const grouped: Record<number, any> = {};
-
-      (data.results || []).forEach((item: any) => {
-        if (!grouped[item.medicine_id]) {
-          grouped[item.medicine_id] = {
-            id: item.medicine_id,
-            brand_name: item.brand_name,
-            generic_name: item.generic_name,
-            strength: item.strength,
-            dosage_form: item.dosage_form,
-            manufacturer: item.manufacturer || item.mfr || "",
-            category: item.category || "",
-            description: item.description || "",
-            uses: item.uses || "",
-            dosage: item.dosage || "",
-            side_effects: item.side_effects || "",
-
-            pharmacies: [],
-            available: 0,
-            price: Number(item.price) || 0,
-          };
-        }
-
-        grouped[item.medicine_id].pharmacies.push(item);
-
-        // Count pharmacies where stock is available
-        if (Number(item.stock) > 0) {
-          grouped[item.medicine_id].available += 1;
-        }
-
-        // Find lowest price
-        if (
-          Number(item.price) > 0 &&
-          (
-            grouped[item.medicine_id].price === 0 ||
-            Number(item.price) < grouped[item.medicine_id].price
-          )
-        ) {
-          grouped[item.medicine_id].price = Number(item.price);
-        }
-      });
-
-      setMedicines(Object.values(grouped));
-
-    } catch (error) {
-      console.error("Failed to load medicine availability:", error);
-      setMedicines([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+    const [medicines, setMedicines] = useState<any[]>([]);
+    const [search, setSearch] = useState("");
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState("");
 
 
-  // ==========================================
-  // LOAD ON PAGE OPEN
-  // ==========================================
+    // ==========================================
+    // LOAD MEDICINE AVAILABILITY
+    // ==========================================
 
-  useEffect(() => {
-    loadMedicines("");
-  }, []);
+    const loadMedicines = async (searchText = "") => {
 
+        try {
 
-  // ==========================================
-  // SEARCH
-  // ==========================================
+            setLoading(true);
+            setError("");
 
-  const handleSearch = () => {
-    loadMedicines(search);
-  };
+            const response = await api.get(
+                `/medicines/availability/search?search=${encodeURIComponent(searchText)}`
+            );
 
-
-  return (
-    <div className="p-6 space-y-5">
-
-      {/* HEADER */}
-      <div>
-        <h1 className="text-2xl font-bold text-slate-800">
-          Find Medicine
-        </h1>
-
-        <p className="text-slate-500 text-sm mt-1">
-          Search medicines and compare prices across pharmacies
-        </p>
-      </div>
+            console.log(
+                "Medicine availability response:",
+                response.data
+            );
 
 
-      {/* SEARCH BOX */}
-      <div className="bg-white rounded-2xl p-5 shadow-sm border border-black/5">
+            if (!response.data.success) {
 
-        <div className="flex gap-3">
+                setMedicines([]);
 
-          <div className="flex-1 flex items-center gap-3 px-4 py-3 rounded-xl border border-slate-200 focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
+                setError(
+                    response.data.message ||
+                    "Failed to load medicines."
+                );
 
-            <Search
-              size={18}
-              className="text-slate-400"
-            />
+                return;
+            }
 
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  handleSearch();
+
+            // ==========================================
+            // GROUP PHARMACY RESULTS BY MEDICINE
+            // ==========================================
+
+            const grouped: Record<number, any> = {};
+
+
+            (response.data.results || []).forEach(
+                (item: any) => {
+
+                    const medicineId =
+                        Number(item.medicine_id);
+
+
+                    if (!grouped[medicineId]) {
+
+                        grouped[medicineId] = {
+
+                            id: medicineId,
+
+                            medicine_id: medicineId,
+
+                            brand_name:
+                                item.brand_name || "",
+
+                            generic_name:
+                                item.generic_name || "",
+
+                            strength:
+                                item.strength || "",
+
+                            dosage_form:
+                                item.dosage_form || "",
+
+                            manufacturer:
+                                item.manufacturer ||
+                                item.mfr ||
+                                "",
+
+                            category:
+                                item.category || "",
+
+                            description:
+                                item.description || "",
+
+                            uses:
+                                item.uses || "",
+
+                            dosage:
+                                item.dosage || "",
+
+                            side_effects:
+                                item.side_effects || "",
+
+                            pharmacies: [],
+
+                            available: 0,
+
+                            price: 0
+                        };
+                    }
+
+
+                    // Add pharmacy information
+                    grouped[medicineId].pharmacies.push({
+                        pharmacy_id: Number(item.pharmacy_id),
+                        medicine_id: Number(item.medicine_id),
+
+                        pharmacy_name: item.pharmacy_name || "",
+                        address: item.address || "",
+                        phone: item.phone || "",
+
+                        latitude: item.latitude,
+                        longitude: item.longitude,
+
+                        stock: Number(item.stock) || 0,
+                        price: Number(item.price) || 0,
+
+                        brand_name: item.brand_name || "",
+                        generic_name: item.generic_name || "",
+                        strength: item.strength || "",
+                        dosage_form: item.dosage_form || ""
+                    });
+
+
+                    // ==========================================
+                    // COUNT AVAILABLE PHARMACIES
+                    // ==========================================
+
+                    if (
+                        Number(item.stock) > 0
+                    ) {
+
+                        grouped[medicineId].available += 1;
+
+                    }
+
+
+                    // ==========================================
+                    // FIND LOWEST PRICE
+                    // ==========================================
+
+                    const itemPrice =
+                        Number(item.price) || 0;
+
+
+                    if (
+                        itemPrice > 0 &&
+                        (
+                            grouped[medicineId].price === 0 ||
+                            itemPrice <
+                            grouped[medicineId].price
+                        )
+                    ) {
+
+                        grouped[medicineId].price =
+                            itemPrice;
+
+                    }
+
                 }
-              }}
-              className="flex-1 outline-none text-sm text-slate-700"
-              placeholder="Search by brand name or generic name..."
-            />
-
-          </div>
+            );
 
 
-          <button
-            onClick={handleSearch}
-            className="px-6 py-3 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition-colors"
-          >
-            Search
-          </button>
+            setMedicines(
+                Object.values(grouped)
+            );
 
-        </div>
+        } catch (error: any) {
 
-      </div>
+            console.error(
+                "Failed to load medicine availability:",
+                error.response?.data || error
+            );
 
+            setMedicines([]);
 
-      {/* RESULT COUNT */}
-      <div className="flex items-center justify-between">
+            setError(
+                error.response?.data?.message ||
+                "Failed to connect to the server."
+            );
 
-        <p className="text-sm text-slate-500">
-          {loading
-            ? "Searching..."
-            : `${medicines.length} medicines found`}
-        </p>
+        } finally {
 
-        {search && !loading && (
-          <button
-            onClick={() => {
-              setSearch("");
-              loadMedicines("");
-            }}
-            className="text-sm text-blue-600 hover:underline"
-          >
-            Clear Search
-          </button>
-        )}
+            setLoading(false);
 
-      </div>
+        }
+    };
 
 
-      {/* LOADING */}
-      {loading && (
-        <div className="bg-white rounded-2xl p-10 text-center shadow-sm border border-black/5">
+    // ==========================================
+    // LOAD ON PAGE OPEN
+    // ==========================================
 
-          <div className="inline-block w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-3" />
+    useEffect(() => {
 
-          <p className="text-sm text-slate-500">
-            Searching medicines...
-          </p>
+        loadMedicines("");
 
-        </div>
-      )}
+    }, []);
 
 
-      {/* NO RESULTS */}
-      {!loading && medicines.length === 0 && (
-        <div className="bg-white rounded-2xl p-10 text-center shadow-sm border border-black/5">
+    // ==========================================
+    // SEARCH
+    // ==========================================
 
-          <Pill
-            size={40}
-            className="mx-auto text-slate-300 mb-3"
-          />
+    const handleSearch = () => {
 
-          <h3 className="font-semibold text-slate-700">
-            No medicines found
-          </h3>
+        loadMedicines(search.trim());
 
-          <p className="text-sm text-slate-400 mt-1">
-            Try searching with another medicine name.
-          </p>
-
-        </div>
-      )}
+    };
 
 
-      {/* MEDICINE CARDS */}
-      {!loading && medicines.length > 0 && (
+    // ==========================================
+    // CLEAR SEARCH
+    // ==========================================
 
-        <div className="grid grid-cols-3 gap-5">
+    const handleClearSearch = () => {
 
-          {medicines.map((med) => (
+        setSearch("");
 
-            <div
-              key={med.id}
-              className="bg-white rounded-2xl p-5 shadow-sm border border-black/5 hover:shadow-md transition-shadow"
-            >
+        loadMedicines("");
 
-              {/* MEDICINE HEADER */}
-              <div className="flex items-start gap-4 mb-4">
-
-                <div className="w-16 h-16 rounded-xl bg-blue-50 flex items-center justify-center flex-shrink-0">
-
-                  <Pill
-                    size={28}
-                    className="text-blue-400"
-                  />
-
-                </div>
+    };
 
 
-                <div className="flex-1">
+    // ==========================================
+    // SELECT MEDICINE
+    // ==========================================
 
-                  <h3 className="font-bold text-slate-800">
-                    {med.brand_name}
-                  </h3>
+    const selectMedicine = (med: any) => {
 
-                  <p className="text-xs text-slate-400">
-                    {med.generic_name || "Generic name not available"}
-                  </p>
+        setSelectedMedicine(med);
 
-                  {med.strength && (
-                    <p className="text-xs text-slate-400 mt-1">
-                      {med.strength}
-                    </p>
-                  )}
+        localStorage.setItem(
+            "selectedMedicine",
+            JSON.stringify(med)
+        );
 
-                </div>
-
-              </div>
+    };
 
 
-              {/* AVAILABILITY + PRICE */}
-              <div className="flex items-center justify-between py-3 border-t border-slate-50">
-
-                <div>
-
-                  <p className="text-xs text-slate-400">
-                    Available at
-                  </p>
-
-                  <p className="text-2xl font-bold text-green-600">
-                    {Number(med.available) || 0}
-                  </p>
-                </div>
+    return (
+        <div className="p-6 space-y-5">
 
 
-                <div className="text-right">
+            {/* ==========================================
+                HEADER
+            ========================================== */}
 
-                  <p className="text-xs text-slate-400">
-                    Lowest Price
-                  </p>
+            <div>
 
-                  <p className="text-xl font-bold text-blue-600">
-                    {med.price > 0
-                      ? `৳${med.price.toFixed(2)}`
-                      : "N/A"}
-                  </p>
+                <h1 className="text-2xl font-bold text-slate-800">
+                    Find Medicine
+                </h1>
 
-                </div>
-
-              </div>
-
-
-              {/* BUTTONS */}
-              <div className="flex gap-2 mt-3">
-
-                <button
-                  onClick={() => {
-                    localStorage.setItem(
-                      "selectedMedicine",
-                      JSON.stringify(med)
-                    );
-
-                    setPage("price-comparison");
-                  }}
-                  className="flex-1 py-2 text-xs font-semibold rounded-xl border border-blue-200 text-blue-600 hover:bg-blue-50 transition-colors"
-                >
-                  Compare Prices
-                </button>
-
-
-                  <button
-                      onClick={() => {
-                        setSelectedMedicine(med);
-                        localStorage.setItem("selectedMedicine", JSON.stringify(med));
-                        setPage("medicine-details");
-                      }}
-                    >
-                      Details
-                    </button>
-
-
-                <button
-                  onClick={() => {
-                    localStorage.setItem(
-                      "selectedMedicine",
-                      JSON.stringify(med)
-                    );
-
-                    setPage("medicine-details");
-                  }}
-                  className="flex-1 py-2 text-xs font-semibold rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition-colors"
-                >
-                  Reserve
-                </button>
-
-              </div>
+                <p className="text-slate-500 text-sm mt-1">
+                    Search medicines and compare prices across pharmacies
+                </p>
 
             </div>
 
-          ))}
+
+            {/* ==========================================
+                SEARCH BOX
+            ========================================== */}
+
+            <div className="bg-white rounded-2xl p-5 shadow-sm border border-black/5">
+
+                <div className="flex gap-3">
+
+                    <div className="flex-1 flex items-center gap-3 px-4 py-3 rounded-xl border border-slate-200 focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
+
+                        <Search
+                            size={18}
+                            className="text-slate-400"
+                        />
+
+                        <input
+                            value={search}
+                            onChange={(e) =>
+                                setSearch(e.target.value)
+                            }
+                            onKeyDown={(e) => {
+
+                                if (e.key === "Enter") {
+                                    handleSearch();
+                                }
+
+                            }}
+                            className="flex-1 outline-none text-sm text-slate-700"
+                            placeholder="Search by brand name or generic name..."
+                        />
+
+                    </div>
+
+
+                    <button
+                        onClick={handleSearch}
+                        disabled={loading}
+                        className="px-6 py-3 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50"
+                    >
+
+                        {loading
+                            ? "Searching..."
+                            : "Search"
+                        }
+
+                    </button>
+
+                </div>
+
+            </div>
+
+
+            {/* ==========================================
+                ERROR
+            ========================================== */}
+
+            {error && (
+
+                <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+
+                    <p className="text-sm font-semibold text-red-700">
+                        {error}
+                    </p>
+
+                    <button
+                        onClick={() =>
+                            loadMedicines(search)
+                        }
+                        className="mt-2 text-xs font-semibold text-red-600 hover:underline"
+                    >
+                        Try Again
+                    </button>
+
+                </div>
+
+            )}
+
+
+            {/* ==========================================
+                RESULT COUNT
+            ========================================== */}
+
+            <div className="flex items-center justify-between">
+
+                <p className="text-sm text-slate-500">
+
+                    {loading
+                        ? "Searching..."
+                        : `${medicines.length} medicines found`
+                    }
+
+                </p>
+
+
+                {search && !loading && (
+
+                    <button
+                        onClick={handleClearSearch}
+                        className="text-sm text-blue-600 hover:underline"
+                    >
+                        Clear Search
+                    </button>
+
+                )}
+
+            </div>
+
+
+            {/* ==========================================
+                LOADING
+            ========================================== */}
+
+            {loading && (
+
+                <div className="bg-white rounded-2xl p-10 text-center shadow-sm border border-black/5">
+
+                    <div className="inline-block w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-3" />
+
+                    <p className="text-sm text-slate-500">
+                        Searching medicines...
+                    </p>
+
+                </div>
+
+            )}
+
+
+            {/* ==========================================
+                NO RESULTS
+            ========================================== */}
+
+            {!loading &&
+                medicines.length === 0 &&
+                !error && (
+
+                    <div className="bg-white rounded-2xl p-10 text-center shadow-sm border border-black/5">
+
+                        <Pill
+                            size={40}
+                            className="mx-auto text-slate-300 mb-3"
+                        />
+
+                        <h3 className="font-semibold text-slate-700">
+                            No medicines found
+                        </h3>
+
+                        <p className="text-sm text-slate-400 mt-1">
+                            Try searching with another medicine name.
+                        </p>
+
+                    </div>
+
+                )}
+
+
+            {/* ==========================================
+                MEDICINE CARDS
+            ========================================== */}
+
+            {!loading &&
+                medicines.length > 0 && (
+
+                    <div className="grid grid-cols-3 gap-5">
+
+                        {medicines.map((med) => (
+
+                            <div
+                                key={med.id}
+                                className="bg-white rounded-2xl p-5 shadow-sm border border-black/5 hover:shadow-md transition-shadow"
+                            >
+
+
+                                {/* ==========================================
+                                    MEDICINE HEADER
+                                ========================================== */}
+
+                                <div className="flex items-start gap-4 mb-4">
+
+                                    <div className="w-16 h-16 rounded-xl bg-blue-50 flex items-center justify-center flex-shrink-0">
+
+                                        <Pill
+                                            size={28}
+                                            className="text-blue-400"
+                                        />
+
+                                    </div>
+
+
+                                    <div className="flex-1">
+
+                                        <h3 className="font-bold text-slate-800">
+                                            {med.brand_name}
+                                        </h3>
+
+
+                                        <p className="text-xs text-slate-400">
+                                            {med.generic_name ||
+                                                "Generic name not available"}
+                                        </p>
+
+
+                                        {med.strength && (
+
+                                            <p className="text-xs text-slate-400 mt-1">
+                                                {med.strength}
+                                            </p>
+
+                                        )}
+
+
+                                        {med.dosage_form && (
+
+                                            <p className="text-xs text-slate-400 mt-1">
+                                                {med.dosage_form}
+                                            </p>
+
+                                        )}
+
+                                    </div>
+
+                                </div>
+
+
+                                {/* ==========================================
+                                    AVAILABILITY + PRICE
+                                ========================================== */}
+
+                                <div className="flex items-center justify-between py-3 border-t border-slate-50">
+
+                                    <div>
+
+                                        <p className="text-xs text-slate-400">
+                                            Available at
+                                        </p>
+
+                                        <p className="text-2xl font-bold text-green-600">
+                                            {med.available}
+                                        </p>
+
+                                        <p className="text-xs text-slate-400">
+                                            pharmacies
+                                        </p>
+
+                                    </div>
+
+
+                                    <div className="text-right">
+
+                                        <p className="text-xs text-slate-400">
+                                            Lowest Price
+                                        </p>
+
+                                        <p className="text-xl font-bold text-blue-600">
+
+                                            {med.price > 0
+                                                ? `৳${med.price.toFixed(2)}`
+                                                : "N/A"
+                                            }
+
+                                        </p>
+
+                                    </div>
+
+                                </div>
+
+
+                                {/* ==========================================
+                                    PHARMACY PREVIEW
+                                ========================================== */}
+
+                                {med.pharmacies.length > 0 && (
+
+                                    <div className="mt-3 bg-slate-50 rounded-xl p-3">
+
+                                        <p className="text-xs font-semibold text-slate-600 mb-2">
+                                            Available Pharmacies
+                                        </p>
+
+
+                                        <div className="space-y-2">
+
+                                            {med.pharmacies
+                                                .filter(
+                                                    (ph: any) =>
+                                                        Number(ph.stock) > 0
+                                                )
+                                                .slice(0, 2)
+                                                .map(
+                                                    (ph: any) => (
+
+                                                        <div
+                                                            key={`${med.id}-${ph.pharmacy_id}`}
+                                                            className="flex items-center justify-between"
+                                                        >
+
+                                                            <div className="min-w-0">
+
+                                                                <p className="text-xs font-semibold text-slate-700 truncate">
+                                                                    {ph.pharmacy_name}
+                                                                </p>
+
+                                                                <p className="text-[11px] text-slate-400 truncate">
+                                                                    {ph.address}
+                                                                </p>
+
+                                                            </div>
+
+
+                                                            <div className="text-right ml-2 flex-shrink-0">
+
+                                                                <p className="text-xs font-bold text-blue-600">
+                                                                    ৳{ph.price.toFixed(2)}
+                                                                </p>
+
+                                                                <p className="text-[11px] text-green-600">
+                                                                    {ph.stock} in stock
+                                                                </p>
+
+                                                            </div>
+
+                                                        </div>
+
+                                                    )
+                                                )}
+
+                                        </div>
+
+                                    </div>
+
+                                )}
+
+
+                                {/* ==========================================
+                                    BUTTONS
+                                ========================================== */}
+
+                                <div className="flex gap-2 mt-4">
+
+                                    {/* Compare */}
+
+                                    <button
+                                        onClick={() => {
+
+                                            selectMedicine(med);
+
+                                            setPage(
+                                                "price-comparison"
+                                            );
+
+                                        }}
+                                        className="flex-1 py-2 text-xs font-semibold rounded-xl border border-blue-200 text-blue-600 hover:bg-blue-50 transition-colors"
+                                    >
+                                        Compare Prices
+                                    </button>
+
+
+                                    {/* Details */}
+
+                                    <button
+                                        onClick={() => {
+
+                                            selectMedicine(med);
+
+                                            setPage(
+                                                "medicine-details"
+                                            );
+
+                                        }}
+                                        className="flex-1 py-2 text-xs font-semibold rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
+                                    >
+                                        Details
+                                    </button>
+
+
+                                    {/* Reserve */}
+
+                                    <button
+                                        onClick={() => {
+
+                                            selectMedicine(med);
+
+                                            setPage(
+                                                "medicine-details"
+                                            );
+
+                                        }}
+                                        className="flex-1 py-2 text-xs font-semibold rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+                                    >
+                                        Reserve
+                                    </button>
+
+                                </div>
+
+                            </div>
+
+                        ))}
+
+                    </div>
+
+                )}
 
         </div>
-
-      )}
-
-    </div>
-  );
+    );
 }
 
 function MedicineDetailsPage({
@@ -1454,18 +1774,14 @@ function MedicineDetailsPage({
 }) {
   const [availability, setAvailability] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [selectedPharmacy, setSelectedPharmacy] = useState<any>(() => {
-    try {
-      const saved = localStorage.getItem("selectedPharmacy");
-      return saved ? JSON.parse(saved) : null;
-    } catch {
-      return null;
-    }
-  });
+  const [selectedPharmacy, setSelectedPharmacy] =
+    useState<any>(null);
+
+  const [showReserveModal, setShowReserveModal] =
+    useState(false);
+
   const [quantity, setQuantity] = useState(1);
-  const [showReserveModal, setShowReserveModal] = useState(() => {
-    return Boolean(localStorage.getItem("selectedPharmacy"));
-  });
+
   const [reserving, setReserving] = useState(false);
 
   const med = selectedMedicine;
@@ -1777,27 +2093,27 @@ function MedicineDetailsPage({
                   </button>
 
 
-                  <button
-                    onClick={() => {
+                    <button
+                        onClick={() => {
 
-                      if (availability.length === 0) {
+                            if (availablePharmacies.length === 0) {
 
-                        alert(
-                          "This medicine is currently unavailable."
-                        );
+                                alert(
+                                    "This medicine is currently unavailable."
+                                );
 
-                        return;
-                      }
+                                return;
+                            }
 
-                      openReserveModal(
-                        availability[0]
-                      );
+                            openReserveModal(
+                                availablePharmacies[0]
+                            );
 
-                    }}
-                    className="px-5 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition-colors"
-                  >
-                    Reserve Medicine
-                  </button>
+                        }}
+                        className="px-5 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition-colors"
+                    >
+                        Reserve Medicine
+                    </button>
 
                 </div>
 
@@ -2719,69 +3035,586 @@ function PriceComparisonPage({ setPage }: { setPage: (p: Page) => void }) {
 }
 
 function PharmacyLocatorPage() {
-  const [selected, setSelected] = useState<number | null>(null);
-  const [pharmacies, setPharmacies] = useState<any[]>([]);
-  return (
-    <div className="p-6 space-y-5">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-800">Pharmacy Locator</h1>
-        <p className="text-slate-500 text-sm mt-1">Find verified pharmacies near your location</p>
-      </div>
-      <div className="grid grid-cols-3 gap-5" style={{ height: 580 }}>
-        <div className="space-y-3 overflow-y-auto pr-2" style={{ scrollbarWidth: "thin" }}>
-          {PHARMACIES.map(ph => (
-            <div
-              key={ph.id}
-              onClick={() => setSelected(ph.id)}
-              className={`p-4 rounded-2xl cursor-pointer transition-all border ${selected === ph.id ? "border-blue-400 bg-blue-50" : "border-black/5 bg-white hover:shadow-sm"}`}
-            >
-              <div className="flex items-start justify-between mb-2">
-                <h3 className="font-bold text-slate-800 text-sm">{ph.name}</h3>
-                <div className="flex items-center gap-1 text-amber-500 text-xs font-semibold">
-                  <Star size={10} fill="currentColor" />{ph.rating}
+
+    const [selected, setSelected] = useState<number | null>(null);
+
+    const [pharmacies, setPharmacies] = useState<any[]>([]);
+
+    const [loading, setLoading] = useState(true);
+
+    const [error, setError] = useState("");
+
+
+    // ==========================================
+    // LOAD APPROVED PHARMACIES
+    // ==========================================
+
+    const loadPharmacies = async () => {
+
+        try {
+
+            setLoading(true);
+
+            setError("");
+
+            const response = await api.get(
+                "/pharmacies"
+            );
+
+            console.log(
+                "Pharmacy response:",
+                response.data
+            );
+
+
+            if (response.data.success) {
+
+                setPharmacies(
+                    response.data.pharmacies || []
+                );
+
+            } else {
+
+                setPharmacies([]);
+
+                setError(
+                    response.data.message ||
+                    "Failed to load pharmacies."
+                );
+            }
+
+        } catch (error: any) {
+
+            console.error(
+                "Failed to load pharmacies:",
+                error.response?.data || error
+            );
+
+            setError(
+                error.response?.data?.message ||
+                "Failed to connect to the server."
+            );
+
+            setPharmacies([]);
+
+        } finally {
+
+            setLoading(false);
+
+        }
+    };
+
+
+    // ==========================================
+    // LOAD ON PAGE OPEN
+    // ==========================================
+
+    useEffect(() => {
+
+        loadPharmacies();
+
+    }, []);
+
+
+    // ==========================================
+    // GET OPENING HOURS
+    // ==========================================
+
+    const getHours = (ph: any) => {
+
+        if (
+            !ph.opening_time &&
+            !ph.closing_time
+        ) {
+            return "Hours unavailable";
+        }
+
+        if (
+            ph.opening_time === "00:00:00" &&
+            ph.closing_time === "23:59:59"
+        ) {
+            return "Open 24 Hours";
+        }
+
+        const opening = ph.opening_time
+            ? String(ph.opening_time).slice(0, 5)
+            : "--";
+
+        const closing = ph.closing_time
+            ? String(ph.closing_time).slice(0, 5)
+            : "--";
+
+        return `${opening} - ${closing}`;
+    };
+
+
+    // ==========================================
+    // GET DIRECTIONS
+    // ==========================================
+
+    const getDirections = (ph: any) => {
+
+        if (
+            ph.latitude &&
+            ph.longitude
+        ) {
+
+            const url =
+                `https://www.google.com/maps/dir/?api=1&destination=${ph.latitude},${ph.longitude}`;
+
+            window.open(
+                url,
+                "_blank"
+            );
+
+            return;
+        }
+
+
+        // Fallback using address
+
+        if (ph.address) {
+
+            const url =
+                `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(ph.address)}`;
+
+            window.open(
+                url,
+                "_blank"
+            );
+
+            return;
+        }
+
+
+        alert(
+            "Location information is not available for this pharmacy."
+        );
+    };
+
+
+    // ==========================================
+    // LOADING
+    // ==========================================
+
+    if (loading) {
+
+        return (
+            <div className="p-6">
+
+                <div className="bg-white rounded-2xl p-12 text-center shadow-sm border border-black/5">
+
+                    <div className="w-10 h-10 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin mx-auto mb-4" />
+
+                    <p className="text-sm text-slate-500">
+                        Loading pharmacies...
+                    </p>
+
                 </div>
-              </div>
-              <p className="text-xs text-slate-400 flex items-center gap-1 mb-2"><MapPin size={10} />{ph.area}</p>
-              <div className="grid grid-cols-2 gap-2 text-xs text-slate-500">
-                <span className="flex items-center gap-1"><Navigation size={10} className="text-blue-400" />{ph.distance}</span>
-                <span className="flex items-center gap-1"><Clock size={10} className="text-green-400" />{ph.hours}</span>
-                <span className="flex items-center gap-1"><Phone size={10} className="text-slate-400" />{ph.phone}</span>
-                <span className="flex items-center gap-1"><Package size={10} className="text-slate-400" />{ph.stock} items</span>
-              </div>
-              <button className="mt-3 w-full py-2 text-xs font-semibold rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition-colors flex items-center justify-center gap-2">
-                <Navigation size={12} />Get Directions
-              </button>
+
             </div>
-          ))}
-        </div>
-        <div className="col-span-2 bg-slate-200 rounded-2xl overflow-hidden relative">
-          <img
-            src="https://images.unsplash.com/photo-1524661135-423995f22d0b?w=900&h=600&fit=crop&auto=format"
-            alt="Map view of Dhaka showing pharmacy locations"
-            className="w-full h-full object-cover"
-          />
-          <div className="absolute inset-0 bg-blue-900/10" />
-          <div className="absolute top-4 left-4 bg-white rounded-xl px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm">
-            📍 Dhanmondi, Dhaka
-          </div>
-          {PHARMACIES.map((ph, i) => (
+        );
+    }
+
+
+    return (
+        <div className="p-6 space-y-5">
+
+            {/* ==========================================
+                HEADER
+            ========================================== */}
+
+            <div>
+
+                <h1 className="text-2xl font-bold text-slate-800">
+                    Pharmacy Locator
+                </h1>
+
+                <p className="text-slate-500 text-sm mt-1">
+                    Find verified pharmacies near your location
+                </p>
+
+            </div>
+
+
+            {/* ==========================================
+                ERROR
+            ========================================== */}
+
+            {error && (
+
+                <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+
+                    <p className="text-sm font-semibold text-red-700">
+                        {error}
+                    </p>
+
+                    <button
+                        onClick={loadPharmacies}
+                        className="mt-2 text-xs font-semibold text-red-600 hover:underline"
+                    >
+                        Try Again
+                    </button>
+
+                </div>
+
+            )}
+
+
+            {/* ==========================================
+                MAIN
+            ========================================== */}
+
             <div
-              key={ph.id}
-              onClick={() => setSelected(ph.id)}
-              className={`absolute w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold cursor-pointer shadow-lg transition-all ${selected === ph.id ? "bg-blue-600 scale-125" : "bg-green-500 hover:scale-110"}`}
-              style={{ left: `${20 + i * 18}%`, top: `${30 + (i % 2) * 25}%` }}
+                className="grid grid-cols-3 gap-5"
+                style={{ height: 580 }}
             >
-              {i + 1}
+
+                {/* ==========================================
+                    PHARMACY LIST
+                ========================================== */}
+
+                <div
+                    className="space-y-3 overflow-y-auto pr-2"
+                    style={{
+                        scrollbarWidth: "thin"
+                    }}
+                >
+
+                    {pharmacies.length === 0 ? (
+
+                        <div className="bg-white rounded-2xl p-8 text-center border border-black/5">
+
+                            <Building2
+                                size={36}
+                                className="mx-auto text-slate-300 mb-3"
+                            />
+
+                            <p className="text-sm font-semibold text-slate-600">
+                                No approved pharmacies found
+                            </p>
+
+                            <p className="text-xs text-slate-400 mt-1">
+                                Approved pharmacies will appear here.
+                            </p>
+
+                        </div>
+
+                    ) : (
+
+                        pharmacies.map((pharmacy) => {
+
+                            const isSelected =
+                                selected === pharmacy.id;
+
+
+                            return (
+
+                                <div
+                                    key={pharmacy.id}
+                                    onClick={() =>
+                                        setSelected(
+                                            pharmacy.id
+                                        )
+                                    }
+                                    className={`p-4 rounded-2xl cursor-pointer transition-all border ${
+                                        isSelected
+                                            ? "border-blue-400 bg-blue-50"
+                                            : "border-black/5 bg-white hover:shadow-sm"
+                                    }`}
+                                >
+
+                                    {/* Pharmacy name */}
+
+                                    <div className="flex items-start justify-between mb-2">
+
+                                        <h3 className="font-bold text-slate-800 text-sm">
+
+                                            {pharmacy.pharmacy_name}
+
+                                        </h3>
+
+
+                                        <div className="flex items-center gap-1 text-green-600 text-xs font-semibold">
+
+                                            <CheckCircle
+                                                size={11}
+                                            />
+
+                                            Verified
+
+                                        </div>
+
+                                    </div>
+
+
+                                    {/* Address */}
+
+                                    <p className="text-xs text-slate-400 flex items-start gap-1 mb-2">
+
+                                        <MapPin
+                                            size={11}
+                                            className="flex-shrink-0 mt-0.5"
+                                        />
+
+                                        <span>
+                                            {pharmacy.address ||
+                                                "Address unavailable"}
+                                        </span>
+
+                                    </p>
+
+
+                                    {/* Details */}
+
+                                    <div className="grid grid-cols-2 gap-2 text-xs text-slate-500">
+
+                                        <span className="flex items-center gap-1">
+
+                                            <Clock
+                                                size={10}
+                                                className="text-green-400"
+                                            />
+
+                                            {getHours(pharmacy)}
+
+                                        </span>
+
+
+                                        <span className="flex items-center gap-1">
+
+                                            <Phone
+                                                size={10}
+                                                className="text-slate-400"
+                                            />
+
+                                            {pharmacy.phone ||
+                                                "No phone"}
+
+                                        </span>
+
+
+                                        <span className="flex items-center gap-1">
+
+                                            <Package
+                                                size={10}
+                                                className="text-slate-400"
+                                            />
+
+                                            {Number(
+                                                pharmacy.inventory_count || 0
+                                            )} medicines
+
+                                        </span>
+
+
+                                        <span className="flex items-center gap-1">
+
+                                            <MapPin
+                                                size={10}
+                                                className="text-blue-400"
+                                            />
+
+                                            {pharmacy.latitude &&
+                                            pharmacy.longitude
+                                                ? "Location available"
+                                                : "Location unavailable"}
+
+                                        </span>
+
+                                    </div>
+
+
+                                    {/* Directions */}
+
+                                    <button
+                                        onClick={(e) => {
+
+                                            e.stopPropagation();
+
+                                            getDirections(
+                                                pharmacy
+                                            );
+
+                                        }}
+                                        className="mt-3 w-full py-2 text-xs font-semibold rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+                                    >
+
+                                        <Navigation
+                                            size={12}
+                                        />
+
+                                        Get Directions
+
+                                    </button>
+
+                                </div>
+
+                            );
+
+                        })
+
+                    )}
+
+                </div>
+
+
+                {/* ==========================================
+                    MAP AREA
+                ========================================== */}
+
+                <div className="col-span-2 bg-slate-200 rounded-2xl overflow-hidden relative">
+
+                    <img
+                        src="https://images.unsplash.com/photo-1524661135-423995f22d0b?w=900&h=600&fit=crop&auto=format"
+                        alt="Map view"
+                        className="w-full h-full object-cover"
+                    />
+
+
+                    <div className="absolute inset-0 bg-blue-900/10" />
+
+
+                    {/* Location label */}
+
+                    <div className="absolute top-4 left-4 bg-white rounded-xl px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm">
+
+                        📍 Bangladesh
+
+                    </div>
+
+
+                    {/* Pharmacy markers */}
+
+                    {pharmacies.map(
+                        (pharmacy, index) => {
+
+                            const left =
+                                15 +
+                                (index * 17) % 70;
+
+                            const top =
+                                25 +
+                                (index * 23) % 50;
+
+
+                            return (
+
+                                <div
+                                    key={pharmacy.id}
+                                    onClick={() =>
+                                        setSelected(
+                                            pharmacy.id
+                                        )
+                                    }
+                                    className={`absolute w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold cursor-pointer shadow-lg transition-all ${
+                                        selected === pharmacy.id
+                                            ? "bg-blue-600 scale-125"
+                                            : "bg-green-500 hover:scale-110"
+                                    }`}
+                                    style={{
+                                        left: `${left}%`,
+                                        top: `${top}%`
+                                    }}
+                                    title={
+                                        pharmacy.pharmacy_name
+                                    }
+                                >
+
+                                    {index + 1}
+
+                                </div>
+
+                            );
+
+                        }
+                    )}
+
+
+                    {/* Selected pharmacy */}
+
+                    {selected && (
+
+                        <div className="absolute bottom-4 left-4 bg-white rounded-xl px-4 py-3 shadow-lg max-w-xs">
+
+                            {(() => {
+
+                                const pharmacy =
+                                    pharmacies.find(
+                                        (p) =>
+                                            p.id === selected
+                                    );
+
+
+                                if (!pharmacy) {
+                                    return null;
+                                }
+
+
+                                return (
+
+                                    <div>
+
+                                        <p className="text-sm font-bold text-slate-800">
+
+                                            {pharmacy.pharmacy_name}
+
+                                        </p>
+
+                                        <p className="text-xs text-slate-400 mt-1">
+
+                                            {pharmacy.address}
+
+                                        </p>
+
+                                        <button
+                                            onClick={() =>
+                                                getDirections(
+                                                    pharmacy
+                                                )
+                                            }
+                                            className="mt-2 text-xs font-semibold text-blue-600 hover:underline"
+                                        >
+
+                                            Get Directions →
+
+                                        </button>
+
+                                    </div>
+
+                                );
+
+                            })()}
+
+                        </div>
+
+                    )}
+
+
+                    {/* Zoom buttons */}
+
+                    <div className="absolute bottom-4 right-4 flex flex-col gap-2">
+
+                        <button
+                            className="w-8 h-8 bg-white rounded-lg shadow flex items-center justify-center text-slate-600 hover:bg-slate-50 font-bold"
+                        >
+                            +
+                        </button>
+
+                        <button
+                            className="w-8 h-8 bg-white rounded-lg shadow flex items-center justify-center text-slate-600 hover:bg-slate-50 font-bold"
+                        >
+                            −
+                        </button>
+
+                    </div>
+
+                </div>
+
             </div>
-          ))}
-          <div className="absolute bottom-4 right-4 flex flex-col gap-2">
-            <button className="w-8 h-8 bg-white rounded-lg shadow flex items-center justify-center text-slate-600 hover:bg-slate-50 font-bold">+</button>
-            <button className="w-8 h-8 bg-white rounded-lg shadow flex items-center justify-center text-slate-600 hover:bg-slate-50 font-bold">−</button>
-          </div>
+
         </div>
-      </div>
-    </div>
-  );
+    );
 }
 
 function PharmacyDashboard({ setPage }: { setPage: (p: Page) => void }) {
@@ -3660,50 +4493,157 @@ function PharmacyInventory() {
         </div>
     );
 }
-
 function MyReservationsPage({
   setPage
 }: {
   setPage: (p: Page) => void;
 }) {
+
   const [reservations, setReservations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  // TEMPORARY USER ID
-  // Later this will come from the logged-in account.
-  const USER_ID = 1;
 
-  const loadReservations = async () => {
+  // ==========================================
+  // GET LOGGED-IN USER
+  // ==========================================
+
+  const getCurrentUser = () => {
+
     try {
-      setLoading(true);
 
-      const response = await api.get(
-        `/reservations/user/${USER_ID}`
-      );
+      const savedUser =
+        localStorage.getItem("user");
 
-      if (response.data.success) {
-        setReservations(response.data.reservations || []);
-      } else {
-        setReservations([]);
+      if (!savedUser) {
+        return null;
       }
+
+      return JSON.parse(savedUser);
+
     } catch (error) {
+
       console.error(
-        "Failed to load reservations:",
+        "Failed to read logged-in user:",
         error
       );
 
-      setReservations([]);
-    } finally {
-      setLoading(false);
+      return null;
     }
   };
 
+
+  // ==========================================
+  // LOAD RESERVATIONS
+  // ==========================================
+
+  const loadReservations = async () => {
+
+    try {
+
+      setLoading(true);
+      setError("");
+
+
+      const user = getCurrentUser();
+
+
+      // No logged-in user
+
+      if (!user || !user.id) {
+
+        setReservations([]);
+
+        setError(
+          "Please login to view your reservations."
+        );
+
+        return;
+      }
+
+
+      console.log(
+        "Loading reservations for user:",
+        user.id
+      );
+
+
+      const response = await api.get(
+        `/reservations/user/${user.id}`
+      );
+
+
+      console.log(
+        "Reservation response:",
+        response.data
+      );
+
+
+      if (response.data.success) {
+
+        setReservations(
+          response.data.reservations || []
+        );
+
+      } else {
+
+        setReservations([]);
+
+        setError(
+          response.data.message ||
+          "Failed to load reservations."
+        );
+
+      }
+
+    } catch (error: any) {
+
+      console.error(
+        "Failed to load reservations:",
+        error.response?.data || error
+      );
+
+
+      setReservations([]);
+
+
+      setError(
+        error.response?.data?.message ||
+        "Failed to load reservations."
+      );
+
+    } finally {
+
+      setLoading(false);
+
+    }
+
+  };
+
+
+  // ==========================================
+  // LOAD WHEN PAGE OPENS
+  // ==========================================
+
   useEffect(() => {
+
     loadReservations();
+
   }, []);
 
-  const getStatusStyle = (status: string) => {
-    switch (String(status).toLowerCase()) {
+
+  // ==========================================
+  // STATUS STYLE
+  // ==========================================
+
+  const getStatusStyle = (
+    status: string
+  ) => {
+
+    switch (
+      String(status).toLowerCase()
+    ) {
+
       case "pending":
         return "bg-yellow-50 text-yellow-700";
 
@@ -3716,404 +4656,380 @@ function MyReservationsPage({
       case "cancelled":
         return "bg-red-50 text-red-700";
 
+      case "rejected":
+        return "bg-red-50 text-red-700";
+
       default:
         return "bg-slate-50 text-slate-600";
     }
+
   };
 
+
+  // ==========================================
+  // REFRESH
+  // ==========================================
+
+  const handleRefresh = () => {
+
+    loadReservations();
+
+  };
+
+
   return (
+
     <div className="p-6 space-y-5">
 
-      {/* HEADER */}
-      <div>
-        <h1 className="text-2xl font-bold text-slate-800">
-          My Reservations
-        </h1>
 
-        <p className="text-slate-500 text-sm mt-1">
-          View and manage your medicine reservations
-        </p>
+      {/* ==========================================
+          HEADER
+      ========================================== */}
+
+      <div className="flex items-center justify-between">
+
+        <div>
+
+          <h1 className="text-2xl font-bold text-slate-800">
+            My Reservations
+          </h1>
+
+          <p className="text-slate-500 text-sm mt-1">
+            View and manage your medicine reservations
+          </p>
+
+        </div>
+
+
+        <button
+          onClick={handleRefresh}
+          className="flex items-center gap-2 px-4 py-2 border border-slate-200 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-50"
+        >
+
+          <RefreshCw size={15} />
+
+          Refresh
+
+        </button>
+
       </div>
 
-      {/* LOADING */}
+
+      {/* ==========================================
+          ERROR
+      ========================================== */}
+
+      {error && (
+
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+
+          <p className="text-sm font-semibold text-red-700">
+            {error}
+          </p>
+
+          {!getCurrentUser() && (
+
+            <button
+              onClick={() => setPage("login")}
+              className="mt-2 text-xs font-semibold text-red-600 hover:underline"
+            >
+              Login now
+            </button>
+
+          )}
+
+        </div>
+
+      )}
+
+
+      {/* ==========================================
+          LOADING
+      ========================================== */}
+
       {loading && (
+
         <div className="bg-white rounded-2xl p-10 text-center shadow-sm border border-black/5">
+
           <div className="inline-block w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-3" />
 
           <p className="text-sm text-slate-500">
             Loading your reservations...
           </p>
-        </div>
-      )}
-
-      {/* EMPTY */}
-      {!loading && reservations.length === 0 && (
-        <div className="bg-white rounded-2xl p-10 text-center shadow-sm border border-black/5">
-
-          <ShoppingBag
-            size={42}
-            className="mx-auto text-slate-300 mb-4"
-          />
-
-          <h3 className="font-semibold text-slate-700">
-            No reservations yet
-          </h3>
-
-          <p className="text-sm text-slate-400 mt-1">
-            Your medicine reservations will appear here.
-          </p>
-
-          <button
-            onClick={() => setPage("medicine-search")}
-            className="mt-5 px-5 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700"
-          >
-            Find Medicine
-          </button>
 
         </div>
+
       )}
 
-      {/* RESERVATIONS */}
-      {!loading && reservations.length > 0 && (
-        <div className="space-y-4">
 
-          {reservations.map((reservation) => (
+      {/* ==========================================
+          EMPTY
+      ========================================== */}
 
-            <div
-              key={reservation.id}
-              className="bg-white rounded-2xl p-5 shadow-sm border border-black/5"
+      {!loading &&
+        !error &&
+        reservations.length === 0 && (
+
+          <div className="bg-white rounded-2xl p-10 text-center shadow-sm border border-black/5">
+
+            <ShoppingBag
+              size={42}
+              className="mx-auto text-slate-300 mb-4"
+            />
+
+            <h3 className="font-semibold text-slate-700">
+              No reservations yet
+            </h3>
+
+            <p className="text-sm text-slate-400 mt-1">
+              Your medicine reservations will appear here.
+            </p>
+
+            <button
+              onClick={() =>
+                setPage("medicine-search")
+              }
+              className="mt-5 px-5 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700"
             >
+              Find Medicine
+            </button>
 
-              <div className="flex items-start justify-between gap-4">
+          </div>
 
-                <div className="flex items-start gap-4">
+        )}
 
-                  <div className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center">
-                    <Pill
-                      size={24}
-                      className="text-blue-500"
-                    />
+
+      {/* ==========================================
+          RESERVATIONS
+      ========================================== */}
+
+      {!loading &&
+        reservations.length > 0 && (
+
+          <div className="space-y-4">
+
+            {reservations.map(
+              (reservation) => (
+
+                <div
+                  key={reservation.id}
+                  className="bg-white rounded-2xl p-5 shadow-sm border border-black/5"
+                >
+
+
+                  {/* ==========================================
+                      TOP
+                  ========================================== */}
+
+                  <div className="flex items-start justify-between gap-4">
+
+                    <div className="flex items-start gap-4">
+
+                      <div className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center">
+
+                        <Pill
+                          size={24}
+                          className="text-blue-500"
+                        />
+
+                      </div>
+
+
+                      <div>
+
+                        <h3 className="font-bold text-slate-800">
+
+                          {reservation.brand_name ||
+                            "Medicine"}
+
+                        </h3>
+
+
+                        <p className="text-sm text-slate-500">
+
+                          {reservation.generic_name ||
+                            "Generic name not available"}
+
+                        </p>
+
+
+                        {reservation.strength && (
+
+                          <p className="text-xs text-slate-400 mt-1">
+
+                            {reservation.strength}
+
+                          </p>
+
+                        )}
+
+                      </div>
+
+                    </div>
+
+
+                    {/* STATUS */}
+
+                    <span
+                      className={`px-3 py-1.5 rounded-full text-xs font-semibold capitalize ${getStatusStyle(
+                        reservation.status
+                      )}`}
+                    >
+
+                      {reservation.status ||
+                        "pending"}
+
+                    </span>
+
                   </div>
 
-                  <div>
 
-                    <h3 className="font-bold text-slate-800">
-                      {reservation.brand_name}
-                    </h3>
+                  {/* ==========================================
+                      DETAILS
+                  ========================================== */}
 
-                    <p className="text-sm text-slate-500">
-                      {reservation.generic_name ||
-                        "Generic name not available"}
+                  <div className="grid grid-cols-4 gap-4 mt-5 pt-4 border-t border-slate-100">
+
+
+                    {/* Pharmacy */}
+
+                    <div>
+
+                      <p className="text-xs text-slate-400">
+                        Pharmacy
+                      </p>
+
+                      <p className="text-sm font-semibold text-slate-700 mt-1">
+
+                        {reservation.pharmacy_name ||
+                          "Unknown Pharmacy"}
+
+                      </p>
+
+                    </div>
+
+
+                    {/* Quantity */}
+
+                    <div>
+
+                      <p className="text-xs text-slate-400">
+                        Quantity
+                      </p>
+
+                      <p className="text-sm font-semibold text-slate-700 mt-1">
+
+                        {reservation.quantity}
+
+                      </p>
+
+                    </div>
+
+
+                    {/* Price */}
+
+                    <div>
+
+                      <p className="text-xs text-slate-400">
+                        Price
+                      </p>
+
+                      <p className="text-sm font-semibold text-blue-600 mt-1">
+
+                        ৳
+                        {Number(
+                          reservation.price || 0
+                        ).toFixed(2)}
+
+                      </p>
+
+                    </div>
+
+
+                    {/* Reservation ID */}
+
+                    <div>
+
+                      <p className="text-xs text-slate-400">
+                        Reservation ID
+                      </p>
+
+                      <p className="text-sm font-semibold text-slate-700 mt-1">
+
+                        #{reservation.id}
+
+                      </p>
+
+                    </div>
+
+                  </div>
+
+
+                  {/* ==========================================
+                      ADDRESS
+                  ========================================== */}
+
+                  {reservation.address && (
+
+                    <div className="mt-4 p-3 bg-slate-50 rounded-xl">
+
+                      <div className="flex items-start gap-2">
+
+                        <MapPin
+                          size={14}
+                          className="text-blue-500 mt-0.5"
+                        />
+
+                        <div>
+
+                          <p className="text-xs text-slate-400">
+                            Pharmacy Address
+                          </p>
+
+                          <p className="text-sm text-slate-600 mt-0.5">
+                            {reservation.address}
+                          </p>
+
+                        </div>
+
+                      </div>
+
+                    </div>
+
+                  )}
+
+
+                  {/* ==========================================
+                      DATE
+                  ========================================== */}
+
+                  {reservation.created_at && (
+
+                    <p className="text-xs text-slate-400 mt-4">
+
+                      Reserved on{" "}
+
+                      {new Date(
+                        reservation.created_at
+                      ).toLocaleString()}
+
                     </p>
 
-                    {reservation.strength && (
-                      <p className="text-xs text-slate-400 mt-1">
-                        {reservation.strength}
-                      </p>
-                    )}
-
-                  </div>
+                  )}
 
                 </div>
 
-                <span
-                  className={`px-3 py-1.5 rounded-full text-xs font-semibold capitalize ${getStatusStyle(
-                    reservation.status
-                  )}`}
-                >
-                  {reservation.status}
-                </span>
-
-              </div>
-
-
-              {/* DETAILS */}
-              <div className="grid grid-cols-4 gap-4 mt-5 pt-4 border-t border-slate-100">
-
-                <div>
-                  <p className="text-xs text-slate-400">
-                    Pharmacy
-                  </p>
-
-                  <p className="text-sm font-semibold text-slate-700 mt-1">
-                    {reservation.pharmacy_name}
-                  </p>
-                </div>
-
-
-                <div>
-                  <p className="text-xs text-slate-400">
-                    Quantity
-                  </p>
-
-                  <p className="text-sm font-semibold text-slate-700 mt-1">
-                    {reservation.quantity}
-                  </p>
-                </div>
-
-
-                <div>
-                  <p className="text-xs text-slate-400">
-                    Price
-                  </p>
-
-                  <p className="text-sm font-semibold text-blue-600 mt-1">
-                    ৳
-                    {Number(
-                      reservation.price || 0
-                    ).toFixed(2)}
-                  </p>
-                </div>
-
-
-                <div>
-                  <p className="text-xs text-slate-400">
-                    Reservation ID
-                  </p>
-
-                  <p className="text-sm font-semibold text-slate-700 mt-1">
-                    #{reservation.id}
-                  </p>
-                </div>
-
-              </div>
-
-
-              {/* DATE */}
-              {reservation.created_at && (
-                <p className="text-xs text-slate-400 mt-4">
-                  Reserved on{" "}
-                  {new Date(
-                    reservation.created_at
-                  ).toLocaleString()}
-                </p>
-              )}
-
-            </div>
-
-          ))}
-
-        </div>
-      )}
-
-    </div>
-  );
-}
-
-function PharmacyReservations() {
-  const PHARMACY_ID = 1; // temporary until pharmacy login is connected
-
-  const [tab, setTab] = useState("Pending");
-  const [reservations, setReservations] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const tabs = ["Pending", "Approved", "Completed", "Rejected"];
-
-  const loadReservations = async () => {
-    try {
-      setLoading(true);
-      const response = await api.get(`/reservations/pharmacy/${PHARMACY_ID}`);
-      setReservations(response.data.reservations || []);
-    } catch (error: any) {
-      console.error("Failed to load pharmacy reservations:", error);
-      alert(error?.response?.data?.message || "Failed to load reservations.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadReservations();
-  }, []);
-
-  const updateStatus = async (id: number, status: string) => {
-    try {
-      await api.patch(`/reservations/${id}/status`, {
-        status,
-        pharmacy_id: PHARMACY_ID,
-      });
-
-      alert(`Reservation ${status}.`);
-      await loadReservations();
-    } catch (error: any) {
-      console.error("Reservation status error:", error);
-      alert(
-        error?.response?.data?.message ||
-        "Failed to update reservation."
-      );
-    }
-  };
-
-  const filtered = reservations.filter(
-    r => String(r.status || "").toLowerCase() === tab.toLowerCase()
-  );
-
-  const statusVariant = (status: string) => {
-    switch (String(status).toLowerCase()) {
-      case "approved":
-        return "blue";
-      case "completed":
-        return "green";
-      case "rejected":
-      case "cancelled":
-        return "red";
-      default:
-        return "yellow";
-    }
-  };
-
-  return (
-    <div className="p-6 space-y-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800">
-            Reservation Management
-          </h1>
-          <p className="text-slate-500 text-sm mt-1">
-            Manage medicine reservations from patients
-          </p>
-        </div>
-
-        <button
-          onClick={loadReservations}
-          className="flex items-center gap-2 px-4 py-2 border border-slate-200 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-50"
-        >
-          <RefreshCw size={15} />
-          Refresh
-        </button>
-      </div>
-
-      <div className="flex gap-2">
-        {tabs.map(t => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition-all ${
-              tab === t
-                ? "bg-blue-600 text-white shadow-sm"
-                : "bg-white text-slate-600 border border-black/5 hover:bg-slate-50"
-            }`}
-          >
-            {t}
-          </button>
-        ))}
-      </div>
-
-      <div className="bg-white rounded-2xl shadow-sm border border-black/5 overflow-hidden">
-        {loading ? (
-          <div className="p-10 text-center text-sm text-slate-500">
-            Loading reservations...
-          </div>
-        ) : (
-          <>
-            <table className="w-full">
-              <thead className="bg-slate-50 border-b border-slate-100">
-                <tr>
-                  {["ID", "Patient", "Medicine", "Qty", "Price", "Date", "Status", "Actions"].map(h => (
-                    <th
-                      key={h}
-                      className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide"
-                    >
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-
-              <tbody className="divide-y divide-slate-50">
-                {filtered.map(r => (
-                  <tr key={r.id} className="hover:bg-slate-50/50">
-                    <td className="px-6 py-4 text-xs font-mono text-slate-400">
-                      #{r.id}
-                    </td>
-
-                    <td className="px-6 py-4">
-                      <p className="text-sm font-semibold text-slate-800">
-                        {r.full_name || r.email || `User ${r.user_id}`}
-                      </p>
-                    </td>
-
-                    <td className="px-6 py-4">
-                      <p className="text-sm font-semibold text-slate-700">
-                        {r.brand_name}
-                      </p>
-                      <p className="text-xs text-slate-400">
-                        {r.generic_name || ""}
-                      </p>
-                    </td>
-
-                    <td className="px-6 py-4 text-sm font-semibold">
-                      {r.quantity}
-                    </td>
-
-                    <td className="px-6 py-4 text-sm font-semibold text-blue-600">
-                      {r.price != null
-                        ? `৳${Number(r.price).toFixed(2)}`
-                        : "—"}
-                    </td>
-
-                    <td className="px-6 py-4 text-sm text-slate-500">
-                      {r.created_at
-                        ? new Date(r.created_at).toLocaleString()
-                        : "—"}
-                    </td>
-
-                    <td className="px-6 py-4">
-                      <Badge
-                        label={String(r.status || "pending").replace(/^./, c => c.toUpperCase())}
-                        variant={statusVariant(r.status)}
-                      />
-                    </td>
-
-                    <td className="px-6 py-4">
-                      {String(r.status).toLowerCase() === "pending" ? (
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => updateStatus(r.id, "approved")}
-                            className="px-3 py-1.5 bg-green-600 text-white text-xs rounded-lg font-semibold hover:bg-green-700 flex items-center gap-1"
-                          >
-                            <CheckCircle size={12} />
-                            Approve
-                          </button>
-
-                          <button
-                            onClick={() => updateStatus(r.id, "rejected")}
-                            className="px-3 py-1.5 bg-red-100 text-red-600 text-xs rounded-lg font-semibold hover:bg-red-200 flex items-center gap-1"
-                          >
-                            <XCircle size={12} />
-                            Reject
-                          </button>
-                        </div>
-                      ) : String(r.status).toLowerCase() === "approved" ? (
-                        <button
-                          onClick={() => updateStatus(r.id, "completed")}
-                          className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded-lg font-semibold hover:bg-blue-700"
-                        >
-                          Mark Completed
-                        </button>
-                      ) : (
-                        <span className="text-xs text-slate-400">
-                          No action
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-
-            {filtered.length === 0 && (
-              <div className="text-center py-12 text-slate-400">
-                <ShoppingBag size={32} className="mx-auto mb-3 opacity-30" />
-                <p className="text-sm">
-                  No {tab.toLowerCase()} reservations
-                </p>
-              </div>
+              )
             )}
-          </>
+
+          </div>
+
         )}
-      </div>
+
     </div>
+
   );
+
 }
 
 function PharmacyProfile() {
@@ -5449,6 +6365,473 @@ return (
 }
 
 // ─── Main App ────────────────────────────────────────────────────────────────
+
+function PharmacyReservations() {
+  const PHARMACY_ID = 1;
+
+  const [tab, setTab] = useState("Pending");
+  const [reservations, setReservations] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const tabs = [
+    "Pending",
+    "Approved",
+    "Completed",
+    "Rejected"
+  ];
+
+  // ==========================================
+  // LOAD PHARMACY RESERVATIONS
+  // ==========================================
+
+  const loadReservations = async () => {
+    try {
+      setLoading(true);
+
+      const response = await api.get(
+        `/reservations/pharmacy/${PHARMACY_ID}`
+      );
+
+      console.log(
+        "Pharmacy reservations:",
+        response.data
+      );
+
+      setReservations(
+        response.data.reservations || []
+      );
+
+    } catch (error: any) {
+
+      console.error(
+        "Failed to load pharmacy reservations:",
+        error
+      );
+
+      alert(
+        error?.response?.data?.message ||
+        "Failed to load reservations."
+      );
+
+      setReservations([]);
+
+    } finally {
+      setLoading(false);
+    }
+  };
+
+
+  // ==========================================
+  // LOAD ON PAGE OPEN
+  // ==========================================
+
+  useEffect(() => {
+    loadReservations();
+  }, []);
+
+
+  // ==========================================
+  // UPDATE RESERVATION STATUS
+  // ==========================================
+
+  const updateStatus = async (
+    id: number,
+    status: string
+  ) => {
+
+    try {
+
+      await api.patch(
+        `/reservations/${id}/status`,
+        {
+          status,
+          pharmacy_id: PHARMACY_ID
+        }
+      );
+
+      alert(
+        `Reservation ${status}.`
+      );
+
+      await loadReservations();
+
+    } catch (error: any) {
+
+      console.error(
+        "Reservation status error:",
+        error
+      );
+
+      alert(
+        error?.response?.data?.message ||
+        "Failed to update reservation."
+      );
+
+    }
+  };
+
+
+  // ==========================================
+  // FILTER
+  // ==========================================
+
+  const filtered = reservations.filter(
+    (r) =>
+      String(r.status || "").toLowerCase() ===
+      tab.toLowerCase()
+  );
+
+
+  // ==========================================
+  // STATUS BADGE
+  // ==========================================
+
+  const statusVariant = (
+    status: string
+  ) => {
+
+    switch (
+      String(status).toLowerCase()
+    ) {
+
+      case "approved":
+        return "blue";
+
+      case "completed":
+        return "green";
+
+      case "rejected":
+      case "cancelled":
+        return "red";
+
+      default:
+        return "yellow";
+    }
+  };
+
+
+  return (
+    <div className="p-6 space-y-5">
+
+      {/* HEADER */}
+
+      <div className="flex items-center justify-between">
+
+        <div>
+
+          <h1 className="text-2xl font-bold text-slate-800">
+            Reservation Management
+          </h1>
+
+          <p className="text-slate-500 text-sm mt-1">
+            Manage medicine reservations from patients
+          </p>
+
+        </div>
+
+
+        <button
+          onClick={loadReservations}
+          className="flex items-center gap-2 px-4 py-2 border border-slate-200 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-50"
+        >
+
+          <RefreshCw size={15} />
+
+          Refresh
+
+        </button>
+
+      </div>
+
+
+      {/* TABS */}
+
+      <div className="flex gap-2">
+
+        {tabs.map((t) => (
+
+          <button
+            key={t}
+            onClick={() => setTab(t)}
+            className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+              tab === t
+                ? "bg-blue-600 text-white shadow-sm"
+                : "bg-white text-slate-600 border border-black/5 hover:bg-slate-50"
+            }`}
+          >
+            {t}
+          </button>
+
+        ))}
+
+      </div>
+
+
+      {/* TABLE */}
+
+      <div className="bg-white rounded-2xl shadow-sm border border-black/5 overflow-hidden">
+
+        {loading ? (
+
+          <div className="p-10 text-center text-sm text-slate-500">
+
+            Loading reservations...
+
+          </div>
+
+        ) : (
+
+          <>
+
+            <table className="w-full">
+
+              <thead className="bg-slate-50 border-b border-slate-100">
+
+                <tr>
+
+                  {[
+                    "ID",
+                    "Patient",
+                    "Medicine",
+                    "Qty",
+                    "Price",
+                    "Date",
+                    "Status",
+                    "Actions"
+                  ].map((h) => (
+
+                    <th
+                      key={h}
+                      className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide"
+                    >
+                      {h}
+                    </th>
+
+                  ))}
+
+                </tr>
+
+              </thead>
+
+
+              <tbody className="divide-y divide-slate-50">
+
+                {filtered.map((r) => (
+
+                  <tr
+                    key={r.id}
+                    className="hover:bg-slate-50/50"
+                  >
+
+                    {/* ID */}
+
+                    <td className="px-6 py-4 text-xs font-mono text-slate-400">
+
+                      #{r.id}
+
+                    </td>
+
+
+                    {/* PATIENT */}
+
+                    <td className="px-6 py-4">
+
+                      <p className="text-sm font-semibold text-slate-800">
+
+                        {r.full_name ||
+                          r.email ||
+                          `User ${r.user_id}`}
+
+                      </p>
+
+                    </td>
+
+
+                    {/* MEDICINE */}
+
+                    <td className="px-6 py-4">
+
+                      <p className="text-sm font-semibold text-slate-700">
+
+                        {r.brand_name}
+
+                      </p>
+
+                      <p className="text-xs text-slate-400">
+
+                        {r.generic_name || ""}
+
+                      </p>
+
+                    </td>
+
+
+                    {/* QUANTITY */}
+
+                    <td className="px-6 py-4 text-sm font-semibold">
+
+                      {r.quantity}
+
+                    </td>
+
+
+                    {/* PRICE */}
+
+                    <td className="px-6 py-4 text-sm font-semibold text-blue-600">
+
+                      {r.price != null
+                        ? `৳${Number(r.price).toFixed(2)}`
+                        : "—"}
+
+                    </td>
+
+
+                    {/* DATE */}
+
+                    <td className="px-6 py-4 text-sm text-slate-500">
+
+                      {r.created_at
+                        ? new Date(
+                            r.created_at
+                          ).toLocaleString()
+                        : "—"}
+
+                    </td>
+
+
+                    {/* STATUS */}
+
+                    <td className="px-6 py-4">
+
+                      <Badge
+                        label={String(
+                          r.status || "pending"
+                        ).replace(
+                          /^./,
+                          (c) => c.toUpperCase()
+                        )}
+                        variant={statusVariant(
+                          r.status
+                        )}
+                      />
+
+                    </td>
+
+
+                    {/* ACTIONS */}
+
+                    <td className="px-6 py-4">
+
+                      {String(
+                        r.status
+                      ).toLowerCase() === "pending" ? (
+
+                        <div className="flex gap-2">
+
+                          <button
+                            onClick={() =>
+                              updateStatus(
+                                r.id,
+                                "approved"
+                              )
+                            }
+                            className="px-3 py-1.5 bg-green-600 text-white text-xs rounded-lg font-semibold hover:bg-green-700 flex items-center gap-1"
+                          >
+
+                            <CheckCircle size={12} />
+
+                            Approve
+
+                          </button>
+
+
+                          <button
+                            onClick={() =>
+                              updateStatus(
+                                r.id,
+                                "rejected"
+                              )
+                            }
+                            className="px-3 py-1.5 bg-red-100 text-red-600 text-xs rounded-lg font-semibold hover:bg-red-200 flex items-center gap-1"
+                          >
+
+                            <XCircle size={12} />
+
+                            Reject
+
+                          </button>
+
+                        </div>
+
+                      ) : String(
+                          r.status
+                        ).toLowerCase() === "approved" ? (
+
+                        <button
+                          onClick={() =>
+                            updateStatus(
+                              r.id,
+                              "completed"
+                            )
+                          }
+                          className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded-lg font-semibold hover:bg-blue-700"
+                        >
+
+                          Mark Completed
+
+                        </button>
+
+                      ) : (
+
+                        <span className="text-xs text-slate-400">
+
+                          No action
+
+                        </span>
+
+                      )}
+
+                    </td>
+
+                  </tr>
+
+                ))}
+
+              </tbody>
+
+            </table>
+
+
+            {/* EMPTY */}
+
+            {filtered.length === 0 && (
+
+              <div className="text-center py-12 text-slate-400">
+
+                <ShoppingBag
+                  size={32}
+                  className="mx-auto mb-3 opacity-30"
+                />
+
+                <p className="text-sm">
+
+                  No {tab.toLowerCase()} reservations
+
+                </p>
+
+              </div>
+
+            )}
+
+          </>
+
+        )}
+
+      </div>
+
+    </div>
+  );
+}
 
 export default function App() {
   const [page, setPage] = useState<Page>("home");

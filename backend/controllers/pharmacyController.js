@@ -7,32 +7,60 @@ exports.getPharmacies = (req, res) => {
 
     const sql = `
         SELECT
-            id,
-            pharmacy_name,
-            owner_name,
-            phone,
-            email,
-            address,
-            latitude,
-            longitude,
-            opening_time,
-            closing_time,
-            status,
-            user_id,
-            created_at
-        FROM pharmacies
-        WHERE status = 'approved'
-        ORDER BY id DESC
+            p.id,
+            p.pharmacy_name,
+            p.owner_name,
+            p.phone,
+            p.email,
+            p.address,
+            p.latitude,
+            p.longitude,
+            p.opening_time,
+            p.closing_time,
+            p.status,
+            p.user_id,
+            p.created_at,
+
+            COUNT(i.id) AS inventory_count
+
+        FROM pharmacies p
+
+        LEFT JOIN inventory i
+            ON p.id = i.pharmacy_id
+
+        WHERE p.status = 'approved'
+
+        GROUP BY
+            p.id,
+            p.pharmacy_name,
+            p.owner_name,
+            p.phone,
+            p.email,
+            p.address,
+            p.latitude,
+            p.longitude,
+            p.opening_time,
+            p.closing_time,
+            p.status,
+            p.user_id,
+            p.created_at
+
+        ORDER BY p.id DESC
     `;
 
     db.query(sql, (err, result) => {
 
         if (err) {
-            console.error(err);
+
+            console.error(
+                "Get Pharmacies Error:",
+                err
+            );
 
             return res.status(500).json({
                 success: false,
-                message: "Failed to fetch pharmacies"
+                message: "Failed to fetch pharmacies",
+                error: err.message
             });
         }
 
@@ -40,9 +68,9 @@ exports.getPharmacies = (req, res) => {
             success: true,
             pharmacies: result
         });
+
     });
 };
-
 
 // ==========================================
 // GET ALL PHARMACIES - ADMIN
