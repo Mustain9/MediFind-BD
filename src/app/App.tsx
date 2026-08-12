@@ -9676,9 +9676,6 @@ const deleteMedicine = async (id: number) => {
                               description:
                                 medicine.description || "",
 
-                              image:
-                                medicine.image || "",
-
                             });
 
                             setShowEditModal(true);
