@@ -229,13 +229,14 @@ exports.createPharmacy = (req, res) => {
     );
 };
 
-
 // ==========================================
 // UPDATE PHARMACY
 // ==========================================
 exports.updatePharmacy = (req, res) => {
 
     const { id } = req.params;
+
+    const userId = req.user.id;
 
     const {
         pharmacy_name,
@@ -249,54 +250,143 @@ exports.updatePharmacy = (req, res) => {
         closing_time
     } = req.body;
 
-    const sql = `
-        UPDATE pharmacies
-        SET
-            pharmacy_name = ?,
-            owner_name = ?,
-            phone = ?,
-            email = ?,
-            address = ?,
-            latitude = ?,
-            longitude = ?,
-            opening_time = ?,
-            closing_time = ?
+
+    // ==========================================
+    // VALIDATION
+    // ==========================================
+
+    if (!pharmacy_name || !pharmacy_name.trim()) {
+        return res.status(400).json({
+            success: false,
+            message: "Pharmacy name is required"
+        });
+    }
+
+    if (!address || !address.trim()) {
+        return res.status(400).json({
+            success: false,
+            message: "Address is required"
+        });
+    }
+
+
+    // ==========================================
+    // CHECK OWNERSHIP
+    // ==========================================
+
+    const checkSql = `
+        SELECT id
+        FROM pharmacies
         WHERE id = ?
+        AND user_id = ?
+        LIMIT 1
     `;
 
     db.query(
-        sql,
-        [
-            pharmacy_name,
-            owner_name,
-            phone,
-            email,
-            address,
-            latitude || null,
-            longitude || null,
-            opening_time || null,
-            closing_time || null,
-            id
-        ],
-        (err, result) => {
+        checkSql,
+        [id, userId],
+        (checkErr, rows) => {
 
-            if (err) {
-                console.error(err);
+            if (checkErr) {
+
+                console.error(
+                    "Pharmacy ownership check error:",
+                    checkErr
+                );
 
                 return res.status(500).json({
                     success: false,
-                    message: "Failed to update pharmacy"
+                    message: "Database error",
+                    error: checkErr.message
                 });
             }
 
-            res.json({
-                success: true,
-                message: "Pharmacy updated successfully"
-            });
+
+            if (rows.length === 0) {
+
+                return res.status(403).json({
+                    success: false,
+                    message:
+                        "You are not authorized to update this pharmacy."
+                });
+            }
+
+
+            // ==========================================
+            // UPDATE
+            // ==========================================
+
+            const updateSql = `
+                UPDATE pharmacies
+                SET
+                    pharmacy_name = ?,
+                    owner_name = ?,
+                    phone = ?,
+                    email = ?,
+                    address = ?,
+                    latitude = ?,
+                    longitude = ?,
+                    opening_time = ?,
+                    closing_time = ?
+                WHERE id = ?
+                AND user_id = ?
+            `;
+
+
+            db.query(
+                updateSql,
+                [
+                    pharmacy_name.trim(),
+                    owner_name || null,
+                    phone || null,
+                    email || null,
+                    address.trim(),
+                    latitude || null,
+                    longitude || null,
+                    opening_time || null,
+                    closing_time || null,
+                    id,
+                    userId
+                ],
+                (err, result) => {
+
+                    if (err) {
+
+                        console.error(
+                            "Update Pharmacy Error:",
+                            err
+                        );
+
+                        return res.status(500).json({
+                            success: false,
+                            message:
+                                "Failed to update pharmacy",
+                            error: err.message
+                        });
+                    }
+
+
+                    if (result.affectedRows === 0) {
+
+                        return res.status(404).json({
+                            success: false,
+                            message:
+                                "Pharmacy was not updated"
+                        });
+                    }
+
+
+                    res.json({
+                        success: true,
+                        message:
+                            "Pharmacy updated successfully"
+                    });
+
+                }
+            );
         }
     );
 };
-
 
 // ==========================================
 // APPROVE PHARMACY

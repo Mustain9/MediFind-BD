@@ -798,178 +798,528 @@ function LoginPage({
     </div>
   );
 }
-function RegisterPage({ setPage }: { setPage: (p: Page) => void }) {
+
+function RegisterPage({
+  setPage
+}: {
+  setPage: (p: Page) => void
+}) {
+
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
+
+  const [address, setAddress] = useState("");
+
   const [role, setRole] = useState("customer");
+
+  const [pharmacyName, setPharmacyName] = useState("");
+  const [licenseNumber, setLicenseNumber] = useState("");
+
+  const [loading, setLoading] = useState(false);
+
+
+  // ==========================================
+  // REGISTER
+  // ==========================================
 
   const handleRegister = async () => {
 
+    // ------------------------------------------
+    // BASIC VALIDATION
+    // ------------------------------------------
+
+    if (!fullName.trim()) {
+      alert("Please enter your full name.");
+      return;
+    }
+
+    if (!email.trim()) {
+      alert("Please enter your email.");
+      return;
+    }
+
+    if (!phone.trim()) {
+      alert("Please enter your phone number.");
+      return;
+    }
+
+    if (!password.trim()) {
+      alert("Please enter your password.");
+      return;
+    }
+
+    if (password.length < 8) {
+      alert("Password must be at least 8 characters.");
+      return;
+    }
+
+    if (!address.trim()) {
+      alert("Please enter your address.");
+      return;
+    }
+
+
+    // ------------------------------------------
+    // PHARMACY VALIDATION
+    // ------------------------------------------
+
+    if (role === "pharmacy") {
+
+      if (!pharmacyName.trim()) {
+        alert("Please enter the pharmacy name.");
+        return;
+      }
+
+      if (!licenseNumber.trim()) {
+        alert("Please enter the DGDA license number.");
+        return;
+      }
+    }
+
+
     try {
 
-        const response = await fetch("http://localhost:5000/api/auth/register", {
+      setLoading(true);
 
-            method: "POST",
 
-            headers: {
-                "Content-Type": "application/json"
-            },
+      // ==========================================
+      // SEND REGISTRATION REQUEST
+      // ==========================================
 
-            body: JSON.stringify({
+      const response = await fetch(
+        "http://localhost:5000/api/auth/register",
+        {
+          method: "POST",
 
-                full_name: fullName,
-                email,
-                phone,
-                password,
-                role
+          headers: {
+            "Content-Type": "application/json"
+          },
 
-            })
+          body: JSON.stringify({
 
-        });
+            full_name: fullName.trim(),
 
-        const data = await response.json();
+            email: email.trim(),
 
-        if (data.success) {
+            phone: phone.trim(),
 
-            alert("Registration Successful!");
+            password,
 
-            setPage("login");
+            address: address.trim(),
+
+            role,
+
+            // Pharmacy fields
+            pharmacy_name:
+              role === "pharmacy"
+                ? pharmacyName.trim()
+                : null,
+
+            license_number:
+              role === "pharmacy"
+                ? licenseNumber.trim()
+                : null
+
+          })
+        }
+      );
+
+
+      const data = await response.json();
+
+
+      console.log(
+        "Registration response:",
+        data
+      );
+
+
+      // ==========================================
+      // SUCCESS
+      // ==========================================
+
+      if (data.success) {
+
+        if (role === "pharmacy") {
+
+          alert(
+            "Pharmacy registration submitted successfully. Your pharmacy is waiting for admin approval."
+          );
 
         } else {
 
-            alert(data.message);
+          alert(
+            "Registration Successful!"
+          );
 
         }
 
+
+        // Clear form
+
+        setFullName("");
+        setEmail("");
+        setPhone("");
+        setPassword("");
+        setAddress("");
+
+        setPharmacyName("");
+        setLicenseNumber("");
+
+        setRole("customer");
+
+
+        // Go to login
+
+        setPage("login");
+
+      } else {
+
+        alert(
+          data.message ||
+          "Registration failed."
+        );
+
+      }
+
     } catch (error) {
 
-        alert("Server Error");
+      console.error(
+        "Registration error:",
+        error
+      );
+
+      alert(
+        "Cannot connect to the server. Make sure the backend is running."
+      );
+
+    } finally {
+
+      setLoading(false);
 
     }
-
   };
+
+
   return (
+
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100 flex items-center justify-center p-6">
+
       <div className="w-full max-w-md">
+
+        {/* ==========================================
+            HEADER
+        ========================================== */}
+
         <div className="text-center mb-8">
+
           <div className="w-14 h-14 rounded-2xl bg-green-600 flex items-center justify-center mx-auto mb-4">
-            <User size={26} className="text-white" />
-          </div>
-          <h1 className="text-2xl font-bold text-slate-800">Create Account</h1>
-          <p className="text-slate-500 text-sm mt-1">Join MediFind BD as a patient</p>
-        </div>
-        <div className="bg-white rounded-2xl p-8 shadow-sm border border-black/5">
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1.5">First Name</label>
-                <input
-                    value={fullName}
-                    onChange={(e)=>setFullName(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all"
-                    placeholder="Rafiqul"
-                    />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Last Name</label>
-                <input className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all" placeholder="Islam" />
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1.5">Phone Number</label>
-              <input
-                    value={phone}
-                    onChange={(e)=>setPhone(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all"
-                    placeholder="01XXXXXXXXX"
-                    />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1.5">Email (Optional)</label>
-              <input
-                    value={email}
-                    onChange={(e)=>setEmail(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all"
-                    placeholder="email@example.com"
-                    />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1.5">Password</label>
-              <input
-                    value={password}
-                    onChange={(e)=>setPassword(e.target.value)}
-                    type="password"
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all"
-                    placeholder="Min. 8 characters"
-                    />
-            </div>
-            <div>
-            <label className="block text-sm font-semibold text-slate-700 mb-1.5">
-              Address
-            </label>
 
-            <input
-              className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all"
-              placeholder="Enter your address"
-            />
-            </div>
-            <div>
-            <label className="block text-sm font-semibold text-slate-700 mb-1.5">
-              Register As
-            </label>
-
-            <select
-                value={role}
-                onChange={(e) => setRole(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-slate-200"
-            >
-                <option value="customer">Customer</option>
-                <option value="pharmacy">Pharmacy</option>
-            </select>
-            </div>
-
-            {role === "pharmacy" && (
-              <>
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">
-                    Pharmacy Name
-                  </label>
-                  <input
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200"
-                    placeholder="ABC Pharmacy"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">
-                    License Number
-                  </label>
-                  <input
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200"
-                    placeholder="DGDA-123456"
-                  />
-                </div>
-              </>
+            {role === "pharmacy" ? (
+              <Building2
+                size={26}
+                className="text-white"
+              />
+            ) : (
+              <User
+                size={26}
+                className="text-white"
+              />
             )}
 
           </div>
-          <button
-              onClick={handleRegister}
-              className="w-full mt-6 py-3 bg-green-600 text-white rounded-xl font-semibold text-sm hover:bg-green-700 transition-colors shadow-sm"
-          >
-              Create Account
-          </button>
-          <div className="mt-4 text-center text-sm text-slate-500">
-            Already have an account?{" "}
-            <button onClick={() => setPage("login")} className="text-blue-600 font-semibold hover:underline">Sign in</button>
-          </div>
+
+
+          <h1 className="text-2xl font-bold text-slate-800">
+            Create Account
+          </h1>
+
+
+          <p className="text-slate-500 text-sm mt-1">
+
+            {role === "pharmacy"
+              ? "Register your pharmacy with MediFind BD"
+              : "Join MediFind BD as a customer"}
+
+          </p>
+
         </div>
+
+
+        {/* ==========================================
+            FORM CARD
+        ========================================== */}
+
+        <div className="bg-white rounded-2xl p-8 shadow-sm border border-black/5">
+
+          <div className="space-y-4">
+
+
+            {/* FULL NAME */}
+
+            <div>
+
+              <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                Full Name
+              </label>
+
+              <input
+                value={fullName}
+                onChange={(e) =>
+                  setFullName(e.target.value)
+                }
+                placeholder="Md. Rahim"
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+              />
+
+            </div>
+
+
+            {/* EMAIL */}
+
+            <div>
+
+              <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                Email
+              </label>
+
+              <input
+                type="email"
+                value={email}
+                onChange={(e) =>
+                  setEmail(e.target.value)
+                }
+                placeholder="example@gmail.com"
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+              />
+
+            </div>
+
+
+            {/* PHONE */}
+
+            <div>
+
+              <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                Phone Number
+              </label>
+
+              <input
+                value={phone}
+                onChange={(e) =>
+                  setPhone(e.target.value)
+                }
+                placeholder="017XXXXXXXX"
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+              />
+
+            </div>
+
+
+            {/* PASSWORD */}
+
+            <div>
+
+              <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                Password
+              </label>
+
+              <input
+                type="password"
+                value={password}
+                onChange={(e) =>
+                  setPassword(e.target.value)
+                }
+                placeholder="Minimum 8 characters"
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+              />
+
+            </div>
+
+
+            {/* ADDRESS */}
+
+            <div>
+
+              <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                Address
+              </label>
+
+              <input
+                value={address}
+                onChange={(e) =>
+                  setAddress(e.target.value)
+                }
+                placeholder="Dhanmondi, Dhaka"
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+              />
+
+            </div>
+
+
+            {/* REGISTER AS */}
+
+            <div>
+
+              <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                Register As
+              </label>
+
+              <select
+                value={role}
+                onChange={(e) =>
+                  setRole(e.target.value)
+                }
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm"
+              >
+
+                <option value="customer">
+                  Customer
+                </option>
+
+                <option value="pharmacy">
+                  Pharmacy
+                </option>
+
+              </select>
+
+            </div>
+
+
+            {/* ==========================================
+                PHARMACY ONLY
+            ========================================== */}
+
+            {role === "pharmacy" && (
+
+              <div className="space-y-4 pt-4 border-t border-slate-100">
+
+
+                {/* PHARMACY NAME */}
+
+                <div>
+
+                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                    Pharmacy Name
+                  </label>
+
+                  <input
+                    value={pharmacyName}
+                    onChange={(e) =>
+                      setPharmacyName(e.target.value)
+                    }
+                    placeholder="ABC Pharmacy"
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-green-400 focus:ring-2 focus:ring-green-100"
+                  />
+
+                </div>
+
+
+                {/* LICENSE */}
+
+                <div>
+
+                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                    DGDA License Number
+                  </label>
+
+                  <input
+                    value={licenseNumber}
+                    onChange={(e) =>
+                      setLicenseNumber(e.target.value)
+                    }
+                    placeholder="DGDA-123456"
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-green-400 focus:ring-2 focus:ring-green-100"
+                  />
+
+                </div>
+
+
+                {/* APPROVAL NOTICE */}
+
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
+
+                  <p className="text-xs text-amber-700">
+
+                    Pharmacy registrations require
+                    admin approval before the pharmacy
+                    can operate.
+
+                  </p>
+
+                </div>
+
+              </div>
+
+            )}
+
+          </div>
+
+
+          {/* ==========================================
+              REGISTER BUTTON
+          ========================================== */}
+
+          <button
+            onClick={handleRegister}
+            disabled={loading}
+            className={`w-full mt-6 py-3 text-white rounded-xl font-semibold text-sm transition-colors shadow-sm ${
+              loading
+                ? "bg-green-400 cursor-not-allowed"
+                : "bg-green-600 hover:bg-green-700"
+            }`}
+          >
+
+            {loading
+              ? "Creating Account..."
+              : role === "pharmacy"
+                ? "Register Pharmacy"
+                : "Create Account"}
+
+          </button>
+
+
+          {/* ==========================================
+              LOGIN
+          ========================================== */}
+
+          <div className="mt-4 text-center text-sm text-slate-500">
+
+            Already have an account?{" "}
+
+            <button
+              onClick={() =>
+                setPage("login")
+              }
+              className="text-blue-600 font-semibold hover:underline"
+            >
+              Sign in
+            </button>
+
+          </div>
+
+        </div>
+
+
+        {/* BACK */}
+
         <p className="text-center text-xs text-slate-400 mt-6">
-          <button onClick={() => setPage("home")} className="hover:text-blue-600">← Back to Home</button>
+
+          <button
+            onClick={() =>
+              setPage("home")
+            }
+            className="hover:text-blue-600"
+          >
+            ← Back to Home
+          </button>
+
         </p>
+
       </div>
+
     </div>
   );
 }
@@ -5617,51 +5967,415 @@ function AdminDashboard({ setPage }: { setPage: (p: Page) => void }) {
     </div>
   );
 }
-
 function AdminPharmacyApproval() {
+  const [pharmacies, setPharmacies] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [processingId, setProcessingId] = useState<number | null>(null);
+
+  // ==========================================
+  // LOAD ALL PHARMACIES
+  // ==========================================
+
+  const loadPharmacies = async () => {
+    try {
+      setLoading(true);
+
+      const response = await fetch(
+        "http://localhost:5000/api/pharmacies/all"
+      );
+
+      const data = await response.json();
+
+      if (!data.success) {
+        throw new Error(data.message || "Failed to load pharmacies");
+      }
+
+      setPharmacies(data.pharmacies || []);
+    } catch (error) {
+      console.error("Failed to load pharmacies:", error);
+      alert("Failed to load pharmacies.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ==========================================
+  // LOAD WHEN PAGE OPENS
+  // ==========================================
+
+  useEffect(() => {
+    loadPharmacies();
+  }, []);
+
+  // ==========================================
+  // APPROVE PHARMACY
+  // ==========================================
+
+  const approvePharmacy = async (id: number) => {
+    try {
+      setProcessingId(id);
+
+      const response = await fetch(
+        `http://localhost:5000/api/pharmacies/${id}/approve`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+
+            // Send token because your backend route uses verifyToken
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(
+          data.message || "Failed to approve pharmacy"
+        );
+      }
+
+      alert("Pharmacy approved successfully.");
+
+      // Reload database data
+      await loadPharmacies();
+    } catch (error: any) {
+      console.error("Approve pharmacy error:", error);
+
+      alert(
+        error?.message || "Failed to approve pharmacy."
+      );
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  // ==========================================
+  // REJECT PHARMACY
+  // ==========================================
+
+  const rejectPharmacy = async (id: number) => {
+    const confirmed = window.confirm(
+      "Are you sure you want to reject this pharmacy?"
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setProcessingId(id);
+
+      const response = await fetch(
+        `http://localhost:5000/api/pharmacies/${id}/reject`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+
+            // Send token because your backend route uses verifyToken
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(
+          data.message || "Failed to reject pharmacy"
+        );
+      }
+
+      alert("Pharmacy rejected successfully.");
+
+      // Reload database data
+      await loadPharmacies();
+    } catch (error: any) {
+      console.error("Reject pharmacy error:", error);
+
+      alert(
+        error?.message || "Failed to reject pharmacy."
+      );
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  // ==========================================
+  // COUNTS
+  // ==========================================
+
+  const pendingCount = pharmacies.filter(
+    (ph) =>
+      String(ph.status).toLowerCase() === "pending"
+  ).length;
+
+  const approvedCount = pharmacies.filter(
+    (ph) =>
+      String(ph.status).toLowerCase() === "approved"
+  ).length;
+
+  const rejectedCount = pharmacies.filter(
+    (ph) =>
+      String(ph.status).toLowerCase() === "rejected"
+  ).length;
+
+  // ==========================================
+  // PENDING PHARMACIES
+  // ==========================================
+
+  const pendingPharmacies = pharmacies.filter(
+    (ph) =>
+      String(ph.status).toLowerCase() === "pending"
+  );
+
+  // ==========================================
+  // FORMAT DATE
+  // ==========================================
+
+  const formatDate = (date: string) => {
+    if (!date) return "—";
+
+    return new Date(date).toLocaleDateString();
+  };
+
+  // ==========================================
+  // LOADING
+  // ==========================================
+
+  if (loading) {
+    return (
+      <div className="p-6">
+        <div className="bg-white rounded-2xl p-10 text-center shadow-sm border border-black/5">
+          <div className="inline-block w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-3" />
+
+          <p className="text-sm text-slate-500">
+            Loading pharmacies...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // ==========================================
+  // PAGE
+  // ==========================================
+
   return (
     <div className="p-6 space-y-5">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-800">Pharmacy Approval</h1>
-        <p className="text-slate-500 text-sm mt-1">Review and approve pharmacy registration requests</p>
+
+      {/* HEADER */}
+
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-800">
+            Pharmacy Approval
+          </h1>
+
+          <p className="text-slate-500 text-sm mt-1">
+            Review and approve pharmacy registration requests
+          </p>
+        </div>
+
+        <button
+          onClick={loadPharmacies}
+          className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-50"
+        >
+          Refresh
+        </button>
       </div>
+
+      {/* ==========================================
+          STAT CARDS
+      ========================================== */}
+
       <div className="grid grid-cols-3 gap-5">
-        <StatCard icon={AlertTriangle} label="Pending Review" value="3" color="bg-amber-500" />
-        <StatCard icon={CheckCircle} label="Approved" value="86" color="bg-green-500" />
-        <StatCard icon={XCircle} label="Rejected" value="12" color="bg-red-400" />
+
+        <StatCard
+          icon={AlertTriangle}
+          label="Pending Review"
+          value={String(pendingCount)}
+          color="bg-amber-500"
+        />
+
+        <StatCard
+          icon={CheckCircle}
+          label="Approved"
+          value={String(approvedCount)}
+          color="bg-green-500"
+        />
+
+        <StatCard
+          icon={XCircle}
+          label="Rejected"
+          value={String(rejectedCount)}
+          color="bg-red-400"
+        />
+
       </div>
-      <div className="space-y-4">
-        {PENDING_PHARMACIES.map(ph => (
-          <div key={ph.id} className="bg-white rounded-2xl p-5 shadow-sm border border-black/5">
-            <div className="flex items-start justify-between">
-              <div className="flex items-start gap-4">
-                <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center">
-                  <Building2 size={22} className="text-blue-600" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-slate-800">{ph.name}</h3>
-                  <p className="text-sm text-slate-500">{ph.owner} · {ph.area}</p>
-                  <div className="mt-2 flex gap-4 text-xs text-slate-400">
-                    <span>Applied: {ph.applied}</span>
-                    <span>License: {ph.license}</span>
+
+      {/* ==========================================
+          PENDING PHARMACIES
+      ========================================== */}
+
+      {pendingPharmacies.length === 0 ? (
+
+        <div className="bg-white rounded-2xl p-12 text-center shadow-sm border border-black/5">
+
+          <CheckCircle
+            size={42}
+            className="mx-auto text-green-400 mb-3"
+          />
+
+          <h3 className="font-semibold text-slate-700">
+            No pending pharmacies
+          </h3>
+
+          <p className="text-sm text-slate-400 mt-1">
+            There are no pharmacy registration requests waiting
+            for approval.
+          </p>
+
+        </div>
+
+      ) : (
+
+        <div className="space-y-4">
+
+          {pendingPharmacies.map((ph) => (
+
+            <div
+              key={ph.id}
+              className="bg-white rounded-2xl p-5 shadow-sm border border-black/5"
+            >
+
+              <div className="flex items-start justify-between">
+
+                {/* PHARMACY INFORMATION */}
+
+                <div className="flex items-start gap-4">
+
+                  <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center">
+
+                    <Building2
+                      size={22}
+                      className="text-blue-600"
+                    />
+
                   </div>
+
+                  <div>
+
+                    <h3 className="font-bold text-slate-800">
+                      {ph.pharmacy_name}
+                    </h3>
+
+                    <p className="text-sm text-slate-500 mt-1">
+                      {ph.owner_name || "Owner not provided"}
+                    </p>
+
+                    <div className="mt-2 space-y-1">
+
+                      <p className="text-xs text-slate-400">
+                        📍 {ph.address || "Address not provided"}
+                      </p>
+
+                      <p className="text-xs text-slate-400">
+                        📞 {ph.phone || "Phone not provided"}
+                      </p>
+
+                      <p className="text-xs text-slate-400">
+                        ✉️ {ph.email || "Email not provided"}
+                      </p>
+
+                    </div>
+
+                    <div className="mt-3 flex gap-4 text-xs text-slate-400">
+
+                      <span>
+                        Applied: {formatDate(ph.created_at)}
+                      </span>
+
+                      <span>
+                        User ID: {ph.user_id || "—"}
+                      </span>
+
+                    </div>
+
+                  </div>
+
                 </div>
+
+                {/* ACTION BUTTONS */}
+
+                <div className="flex gap-2">
+
+                  {/* VIEW */}
+
+                  <button
+                    onClick={() => {
+                      alert(
+                        `Pharmacy: ${ph.pharmacy_name}\n\n` +
+                        `Owner: ${ph.owner_name || "N/A"}\n` +
+                        `Phone: ${ph.phone || "N/A"}\n` +
+                        `Email: ${ph.email || "N/A"}\n` +
+                        `Address: ${ph.address || "N/A"}`
+                      );
+                    }}
+                    className="px-4 py-2 border border-slate-200 text-slate-600 text-sm rounded-xl font-semibold hover:bg-slate-50 flex items-center gap-2"
+                  >
+                    <Eye size={14} />
+                    View
+                  </button>
+
+                  {/* APPROVE */}
+
+                  <button
+                    disabled={processingId === ph.id}
+                    onClick={() =>
+                      approvePharmacy(ph.id)
+                    }
+                    className="px-4 py-2 bg-green-600 text-white text-sm rounded-xl font-semibold hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+
+                    <CheckCircle size={14} />
+
+                    {processingId === ph.id
+                      ? "Processing..."
+                      : "Approve"}
+
+                  </button>
+
+                  {/* REJECT */}
+
+                  <button
+                    disabled={processingId === ph.id}
+                    onClick={() =>
+                      rejectPharmacy(ph.id)
+                    }
+                    className="px-4 py-2 bg-red-100 text-red-600 text-sm rounded-xl font-semibold hover:bg-red-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+
+                    <XCircle size={14} />
+
+                    Reject
+
+                  </button>
+
+                </div>
+
               </div>
-              <div className="flex gap-2">
-                <button className="px-4 py-2 border border-slate-200 text-slate-600 text-sm rounded-xl font-semibold hover:bg-slate-50 flex items-center gap-2">
-                  <Eye size={14} />View Docs
-                </button>
-                <button className="px-4 py-2 bg-green-600 text-white text-sm rounded-xl font-semibold hover:bg-green-700 flex items-center gap-2">
-                  <CheckCircle size={14} />Approve
-                </button>
-                <button className="px-4 py-2 bg-red-100 text-red-600 text-sm rounded-xl font-semibold hover:bg-red-200 flex items-center gap-2">
-                  <XCircle size={14} />Reject
-                </button>
-              </div>
+
             </div>
-          </div>
-        ))}
-      </div>
+
+          ))}
+
+        </div>
+
+      )}
+
     </div>
   );
 }

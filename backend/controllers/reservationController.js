@@ -216,22 +216,34 @@ exports.getPharmacyReservations = (req, res) => {
     });
 };
 
-
-// Pharmacy changes reservation status.
+// ==========================================
+// UPDATE RESERVATION STATUS
+// ==========================================
 exports.updateReservationStatus = (req, res) => {
+
     const reservationId = Number(req.params.id);
     const pharmacyId = Number(req.body.pharmacy_id);
     const newStatus = String(req.body.status || "").toLowerCase();
 
-    const allowedStatuses = ["approved", "completed", "cancelled"];
+    // Allowed statuses
+    const allowedStatuses = [
+        "approved",
+        "completed",
+        "rejected"
+    ];
 
-    if (!reservationId || !pharmacyId || !allowedStatuses.includes(newStatus)) {
+    if (
+        !reservationId ||
+        !pharmacyId ||
+        !allowedStatuses.includes(newStatus)
+    ) {
         return res.status(400).json({
             success: false,
             message: "Invalid reservation status request."
         });
     }
 
+    // Find reservation
     const selectSql = `
         SELECT
             r.id,
@@ -240,105 +252,182 @@ exports.updateReservationStatus = (req, res) => {
             r.quantity,
             r.status
         FROM reservations r
-        WHERE r.id = ? AND r.pharmacy_id = ?
+        WHERE r.id = ?
+        AND r.pharmacy_id = ?
         LIMIT 1
     `;
 
-    db.query(selectSql, [reservationId, pharmacyId], (err, rows) => {
-        if (err) {
-            console.error("Reservation lookup error:", err);
-            return res.status(500).json({
-                success: false,
-                message: "Failed to find reservation."
-            });
-        }
+    db.query(
+        selectSql,
+        [reservationId, pharmacyId],
+        (err, rows) => {
 
-        if (!rows.length) {
-            return res.status(404).json({
-                success: false,
-                message: "Reservation not found."
-            });
-        }
+            if (err) {
+                console.error(
+                    "Reservation lookup error:",
+                    err
+                );
 
-        const reservation = rows[0];
-        const currentStatus = String(reservation.status).toLowerCase();
-
-        // Valid workflow:
-        // pending -> approved
-        // pending -> cancelled (restore stock)
-        // approved -> completed
-        if (
-            (currentStatus === "pending" &&
-                !["approved", "cancelled"].includes(newStatus)) ||
-            (currentStatus === "approved" && newStatus !== "completed") ||
-            ["completed", "cancelled"].includes(currentStatus)
-        ) {
-            return res.status(409).json({
-                success: false,
-                message: `Cannot change ${currentStatus} reservation to ${newStatus}.`
-            });
-        }
-
-        const updateSql = `
-            UPDATE reservations
-            SET status = ?
-            WHERE id = ? AND pharmacy_id = ?
-        `;
-
-        db.query(
-            updateSql,
-            [newStatus, reservationId, pharmacyId],
-            (updateErr, result) => {
-                if (updateErr) {
-                    console.error("Reservation update error:", updateErr);
-                    return res.status(500).json({
-                        success: false,
-                        message: "Failed to update reservation."
-                    });
-                }
-
-                if (!result.affectedRows) {
-                    return res.status(404).json({
-                        success: false,
-                        message: "Reservation was not updated."
-                    });
-                }
-
-                // Stock was removed when the reservation was created.
-                // If the pharmacy cancels/rejects it, put the stock back.
-                if (newStatus === "cancelled") {
-                    db.query(
-                        `
-                        UPDATE inventory
-                        SET stock = stock + ?
-                        WHERE pharmacy_id = ? AND medicine_id = ?
-                        `,
-                        [
-                            reservation.quantity,
-                            pharmacyId,
-                            reservation.medicine_id
-                        ],
-                        (restoreErr) => {
-                            if (restoreErr) {
-                                console.error("Stock restore error:", restoreErr);
-                            }
-
-                            return res.json({
-                                success: true,
-                                message: "Reservation cancelled and stock restored.",
-                                status: "cancelled"
-                            });
-                        }
-                    );
-                    return;
-                }
-
-                return res.json({
-                    success: true,
-                    message: `Reservation ${newStatus}.`,
-                    status: newStatus
+                return res.status(500).json({
+                    success: false,
+                    message: "Failed to find reservation."
                 });
             }
-        );
-    });
+
+            if (rows.length === 0) {
+                return res.status(404).json({
+                    success: false,
+                    message: "Reservation not found."
+                });
+            }
+
+            const reservation = rows[0];
+
+            const currentStatus =
+                String(reservation.status).toLowerCase();
+
+
+            // ==========================================
+            // VALID STATUS WORKFLOW
+            // ==========================================
+            //
+            // pending   -> approved
+            // pending   -> rejected
+            // approved  -> completed
+            //
+            // completed -> cannot change
+            // rejected  -> cannot change
+            //
+
+            if (
+                (currentStatus === "pending" &&
+                    !["approved", "rejected"].includes(newStatus)) ||
+
+                (currentStatus === "approved" &&
+                    newStatus !== "completed") ||
+
+                ["completed", "rejected"].includes(currentStatus)
+            ) {
+
+                return res.status(409).json({
+                    success: false,
+                    message:
+                        `Cannot change ${currentStatus} reservation to ${newStatus}.`
+                });
+            }
+
+
+            // ==========================================
+            // UPDATE RESERVATION
+            // ==========================================
+
+            const updateSql = `
+                UPDATE reservations
+                SET status = ?
+                WHERE id = ?
+                AND pharmacy_id = ?
+            `;
+
+            db.query(
+                updateSql,
+                [
+                    newStatus,
+                    reservationId,
+                    pharmacyId
+                ],
+                (updateErr, result) => {
+
+                    if (updateErr) {
+
+                        console.error(
+                            "Reservation update error:",
+                            updateErr
+                        );
+
+                        return res.status(500).json({
+                            success: false,
+                            message:
+                                "Failed to update reservation.",
+                            error: updateErr.message
+                        });
+                    }
+
+
+                    if (result.affectedRows === 0) {
+
+                        return res.status(404).json({
+                            success: false,
+                            message:
+                                "Reservation was not updated."
+                        });
+                    }
+
+
+                    // ==========================================
+                    // REJECTED = RESTORE STOCK
+                    // ==========================================
+
+                    if (newStatus === "rejected") {
+
+                        const restoreStockSql = `
+                            UPDATE inventory
+                            SET stock = stock + ?
+                            WHERE pharmacy_id = ?
+                            AND medicine_id = ?
+                        `;
+
+                        db.query(
+                            restoreStockSql,
+                            [
+                                reservation.quantity,
+                                pharmacyId,
+                                reservation.medicine_id
+                            ],
+                            (restoreErr) => {
+
+                                if (restoreErr) {
+
+                                    console.error(
+                                        "Stock restore error:",
+                                        restoreErr
+                                    );
+
+                                    return res.status(500).json({
+                                        success: false,
+                                        message:
+                                            "Reservation rejected, but stock could not be restored.",
+                                        error:
+                                            restoreErr.message
+                                    });
+                                }
+
+
+                                return res.json({
+                                    success: true,
+                                    message:
+                                        "Reservation rejected and stock restored.",
+                                    status: "rejected"
+                                });
+                            }
+                        );
+
+                        return;
+                    }
+
+
+                    // ==========================================
+                    // APPROVED / COMPLETED
+                    // ==========================================
+
+                    return res.json({
+                        success: true,
+                        message:
+                            `Reservation ${newStatus}.`,
+                        status: newStatus
+                    });
+
+                }
+            );
+        }
+    );
 };

@@ -15,31 +15,91 @@ const {
 
 const verifyToken = require("../middleware/authMiddleware");
 
-router.get("/my-pharmacy", verifyToken, getMyPharmacy);
 
-// Get single pharmacy
-router.get("/:id", getPharmacyById);
+// ==========================================
+// LOGGED-IN PHARMACY
+// ==========================================
 
-
-// Get approved pharmacies
-router.get("/", getPharmacies);
-
-// Get all pharmacies - admin
-router.get("/all", getAllPharmacies);
-
+router.get(
+    "/my-pharmacy",
+    verifyToken,
+    getMyPharmacy
+);
 
 
-// Create pharmacy
-router.post("/", createPharmacy);
+// ==========================================
+// APPROVED PHARMACIES
+// ==========================================
 
-// Update pharmacy
-router.put("/:id", updatePharmacy);
+router.get(
+    "/",
+    getPharmacies
+);
 
-// Approve pharmacy
-router.put("/:id/approve", approvePharmacy);
 
-// Reject pharmacy
-router.put("/:id/reject", rejectPharmacy);
+// ==========================================
+// ADMIN - ALL PHARMACIES
+// IMPORTANT: MUST COME BEFORE /:id
+// ==========================================
+
+router.get(
+    "/all",
+    getAllPharmacies
+);
+
+
+// ==========================================
+// CREATE PHARMACY
+// ==========================================
+
+router.post(
+    "/",
+    createPharmacy
+);
+
+
+// ==========================================
+// ADMIN - APPROVE PHARMACY
+// ==========================================
+
+router.put(
+    "/:id/approve",
+    verifyToken,
+    approvePharmacy
+);
+
+
+// ==========================================
+// ADMIN - REJECT PHARMACY
+// ==========================================
+
+router.put(
+    "/:id/reject",
+    verifyToken,
+    rejectPharmacy
+);
+
+
+// ==========================================
+// UPDATE PHARMACY
+// ==========================================
+
+router.put(
+    "/:id",
+    verifyToken,
+    updatePharmacy
+);
+
+
+// ==========================================
+// GET SINGLE PHARMACY
+// IMPORTANT: KEEP THIS LAST
+// ==========================================
+
+router.get(
+    "/:id",
+    getPharmacyById
+);
 
 
 module.exports = router;
