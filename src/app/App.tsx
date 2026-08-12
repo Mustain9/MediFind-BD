@@ -3967,80 +3967,677 @@ function PharmacyLocatorPage() {
     );
 }
 
-function PharmacyDashboard({ setPage }: { setPage: (p: Page) => void }) {
+function PharmacyDashboard({
+  setPage
+}: {
+  setPage: (p: Page) => void;
+}) {
+  const [pharmacy, setPharmacy] = useState<any>(null);
+  const [inventory, setInventory] = useState<any[]>([]);
+  const [reservations, setReservations] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // ==========================================
+  // LOAD DASHBOARD DATA
+  // ==========================================
+
+  const loadDashboard = async () => {
+    try {
+      setLoading(true);
+
+      // ----------------------------------------
+      // GET LOGGED-IN PHARMACY
+      // ----------------------------------------
+
+      const pharmacyResponse = await api.get(
+        "/pharmacies/my-pharmacy"
+      );
+
+      const pharmacyData =
+        pharmacyResponse.data?.pharmacy;
+
+      if (!pharmacyData) {
+        throw new Error(
+          "Pharmacy information not found."
+        );
+      }
+
+      setPharmacy(pharmacyData);
+
+      const pharmacyId =
+        pharmacyData.id;
+
+      // ----------------------------------------
+      // GET INVENTORY
+      // ----------------------------------------
+
+      const inventoryResponse = await api.get(
+        "/inventory/my-inventory"
+      );
+
+      const inventoryData =
+        inventoryResponse.data?.inventory || [];
+
+      setInventory(inventoryData);
+
+      // ----------------------------------------
+      // GET RESERVATIONS
+      // ----------------------------------------
+
+      const reservationResponse =
+        await api.get(
+          `/reservations/pharmacy/${pharmacyId}`
+        );
+
+      const reservationData =
+        reservationResponse.data?.reservations || [];
+
+      setReservations(reservationData);
+
+    } catch (error: any) {
+
+      console.error(
+        "Dashboard loading error:",
+        error.response?.data || error
+      );
+
+      alert(
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to load pharmacy dashboard."
+      );
+
+    } finally {
+
+      setLoading(false);
+
+    }
+  };
+
+
+  // ==========================================
+  // LOAD ON PAGE OPEN
+  // ==========================================
+
+  useEffect(() => {
+    loadDashboard();
+  }, []);
+
+
+  // ==========================================
+  // INVENTORY STATISTICS
+  // ==========================================
+
+  const totalMedicines =
+    inventory.length;
+
+  const availableMedicines =
+    inventory.filter(
+      item => Number(item.stock) > 0
+    ).length;
+
+  const lowStockMedicines =
+    inventory.filter(
+      item =>
+        Number(item.stock) > 0 &&
+        Number(item.stock) < 15
+    );
+
+  const outOfStockMedicines =
+    inventory.filter(
+      item =>
+        Number(item.stock) === 0
+    );
+
+
+  // ==========================================
+  // RESERVATION STATISTICS
+  // ==========================================
+
+  const today = new Date();
+
+  const todayReservations =
+    reservations.filter((r) => {
+
+      if (!r.created_at) {
+        return false;
+      }
+
+      const reservationDate =
+        new Date(r.created_at);
+
+      return (
+        reservationDate.toDateString() ===
+        today.toDateString()
+      );
+    });
+
+
+  const pendingReservations =
+    reservations.filter(
+      r =>
+        String(r.status).toLowerCase() ===
+        "pending"
+    );
+
+
+  // ==========================================
+  // RECENT RESERVATIONS
+  // ==========================================
+
+  const recentReservations =
+    [...reservations]
+      .sort(
+        (a, b) =>
+          new Date(
+            b.created_at || 0
+          ).getTime() -
+          new Date(
+            a.created_at || 0
+          ).getTime()
+      )
+      .slice(0, 4);
+
+
+  // ==========================================
+  // LOADING
+  // ==========================================
+
+  if (loading) {
+    return (
+      <div className="p-6">
+
+        <div className="bg-white rounded-2xl p-10 text-center shadow-sm border border-black/5">
+
+          <div className="inline-block w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-3" />
+
+          <p className="text-sm text-slate-500">
+            Loading pharmacy dashboard...
+          </p>
+
+        </div>
+
+      </div>
+    );
+  }
+
+
+  // ==========================================
+  // DASHBOARD
+  // ==========================================
+
   return (
     <div className="p-6 space-y-6">
+
+      {/* ========================================
+          HEADER
+      ======================================== */}
+
       <div className="flex items-center justify-between">
+
         <div>
-          <h1 className="text-2xl font-bold text-slate-800">Pharmacy Dashboard</h1>
-          <p className="text-slate-500 text-sm mt-1">Dhaka Medical Pharmacy · Shahbag, Dhaka</p>
+
+          <h1 className="text-2xl font-bold text-slate-800">
+            Pharmacy Dashboard
+          </h1>
+
+          <p className="text-slate-500 text-sm mt-1">
+
+            {pharmacy?.pharmacy_name ||
+              "Your Pharmacy"}
+
+            {" · "}
+
+            {pharmacy?.address ||
+              "Address not available"}
+
+          </p>
+
         </div>
+
+
         <div className="flex items-center gap-3">
-          <span className="flex items-center gap-1.5 text-xs text-green-600 bg-green-50 px-3 py-1.5 rounded-full font-semibold">
-            <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
-            Open Now
+
+          {/* STATUS */}
+
+          <span
+            className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full font-semibold ${
+              String(
+                pharmacy?.status
+              ).toLowerCase() === "approved"
+                ? "text-green-600 bg-green-50"
+                : "text-amber-600 bg-amber-50"
+            }`}
+          >
+
+            <span
+              className={`w-1.5 h-1.5 rounded-full ${
+                String(
+                  pharmacy?.status
+                ).toLowerCase() === "approved"
+                  ? "bg-green-500"
+                  : "bg-amber-500"
+              }`}
+            />
+
+            {pharmacy?.status || "Pending"}
+
           </span>
-          <button onClick={() => setPage("pharmacy-inventory")} className="px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition-colors flex items-center gap-2">
-            <Plus size={16} />Add Medicine
+
+
+          {/* ADD MEDICINE */}
+
+          <button
+            onClick={() =>
+              setPage("pharmacy-inventory")
+            }
+            className="px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition-colors flex items-center gap-2"
+          >
+            <Plus size={16} />
+            Add Medicine
           </button>
+
         </div>
+
       </div>
+
+
+      {/* ========================================
+          STAT CARDS
+      ======================================== */}
 
       <div className="grid grid-cols-4 gap-5">
-        <StatCard icon={Package} label="Total Medicines" value="342" sub="in inventory" color="bg-blue-500" />
-        <StatCard icon={CheckCircle} label="Available" value="298" sub="87% in stock" color="bg-green-500" />
-        <StatCard icon={ShoppingBag} label="Today's Reservations" value="18" sub="6 pending" color="bg-amber-500" />
-        <StatCard icon={Users} label="Total Customers" value="1,240" sub="this month" color="bg-purple-500" />
+
+        <StatCard
+          icon={Package}
+          label="Total Medicines"
+          value={String(totalMedicines)}
+          sub="in inventory"
+          color="bg-blue-500"
+        />
+
+        <StatCard
+          icon={CheckCircle}
+          label="Available"
+          value={String(availableMedicines)}
+          sub="currently in stock"
+          color="bg-green-500"
+        />
+
+        <StatCard
+          icon={ShoppingBag}
+          label="Today's Reservations"
+          value={String(
+            todayReservations.length
+          )}
+          sub={`${pendingReservations.length} pending`}
+          color="bg-amber-500"
+        />
+
+        <StatCard
+          icon={Users}
+          label="Customers"
+          value={String(
+            new Set(
+              reservations
+                .map(r => r.user_id)
+                .filter(Boolean)
+            ).size
+          )}
+          sub="from reservations"
+          color="bg-purple-500"
+        />
+
       </div>
 
-      {/* Low stock alert */}
-      <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3">
-        <AlertTriangle size={18} className="text-amber-500 flex-shrink-0 mt-0.5" />
-        <div>
-          <p className="text-sm font-semibold text-amber-800">Low Stock Alert</p>
-          <p className="text-xs text-amber-600">Seclo 20 (12 units), Losectil 500 (7 units) are running low. Please restock soon.</p>
+
+      {/* ========================================
+          LOW STOCK ALERT
+      ======================================== */}
+
+      {lowStockMedicines.length > 0 && (
+
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3">
+
+          <AlertTriangle
+            size={18}
+            className="text-amber-500 flex-shrink-0 mt-0.5"
+          />
+
+          <div>
+
+            <p className="text-sm font-semibold text-amber-800">
+              Low Stock Alert
+            </p>
+
+            <p className="text-xs text-amber-600 mt-1">
+
+              {lowStockMedicines
+                .slice(0, 4)
+                .map(
+                  item =>
+                    `${item.brand_name || "Medicine"} (${item.stock} units)`
+                )
+                .join(", ")}
+
+              {lowStockMedicines.length > 4
+                ? " and more"
+                : ""}
+
+              {" "}are running low.
+
+            </p>
+
+          </div>
+
+
+          <button
+            onClick={() =>
+              setPage("pharmacy-inventory")
+            }
+            className="ml-auto text-xs font-semibold text-amber-700 hover:underline whitespace-nowrap"
+          >
+            Update Stock
+          </button>
+
         </div>
-        <button onClick={() => setPage("pharmacy-inventory")} className="ml-auto text-xs font-semibold text-amber-700 hover:underline whitespace-nowrap">Update Stock</button>
-      </div>
+
+      )}
+
+
+      {/* ========================================
+          OUT OF STOCK ALERT
+      ======================================== */}
+
+      {outOfStockMedicines.length > 0 && (
+
+        <div className="bg-red-50 border border-red-200 rounded-2xl p-4 flex items-start gap-3">
+
+          <XCircle
+            size={18}
+            className="text-red-500 flex-shrink-0 mt-0.5"
+          />
+
+          <div>
+
+            <p className="text-sm font-semibold text-red-800">
+              Out of Stock
+            </p>
+
+            <p className="text-xs text-red-600 mt-1">
+
+              {outOfStockMedicines
+                .slice(0, 4)
+                .map(
+                  item =>
+                    item.brand_name ||
+                    "Medicine"
+                )
+                .join(", ")}
+
+              {outOfStockMedicines.length > 4
+                ? " and more"
+                : ""}
+
+            </p>
+
+          </div>
+
+        </div>
+
+      )}
+
+
+      {/* ========================================
+          RESERVATIONS + INVENTORY
+      ======================================== */}
 
       <div className="grid grid-cols-2 gap-5">
-        {/* Sales chart */}
+
+
+        {/* ======================================
+            RECENT RESERVATIONS
+        ====================================== */}
+
         <div className="bg-white rounded-2xl p-5 shadow-sm border border-black/5">
-          <h3 className="font-bold text-slate-800 mb-4">Weekly Overview</h3>
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={salesData} barSize={10}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-              <XAxis dataKey="day" tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
-              <Tooltip contentStyle={{ borderRadius: 12, border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }} />
-              <Bar dataKey="reservations" fill="#2563eb" radius={[4, 4, 0, 0]} name="Reservations" />
-              <Bar dataKey="customers" fill="#16a34a" radius={[4, 4, 0, 0]} name="Customers" />
-            </BarChart>
-          </ResponsiveContainer>
+
+          <div className="flex items-center justify-between mb-4">
+
+            <h3 className="font-bold text-slate-800">
+              Recent Reservations
+            </h3>
+
+            <button
+              onClick={() =>
+                setPage(
+                  "pharmacy-reservations"
+                )
+              }
+              className="text-xs text-blue-600 hover:underline"
+            >
+              View All
+            </button>
+
+          </div>
+
+
+          {recentReservations.length === 0 ? (
+
+            <div className="text-center py-8">
+
+              <ShoppingBag
+                size={32}
+                className="mx-auto text-slate-300 mb-2"
+              />
+
+              <p className="text-sm text-slate-400">
+                No reservations yet
+              </p>
+
+            </div>
+
+          ) : (
+
+            <div className="space-y-3">
+
+              {recentReservations.map(
+                reservation => (
+
+                  <div
+                    key={reservation.id}
+                    className="flex items-center justify-between py-2 border-b border-slate-50 last:border-0"
+                  >
+
+                    <div>
+
+                      <p className="text-sm font-semibold text-slate-800">
+
+                        {reservation.full_name ||
+                          reservation.email ||
+                          `User ${reservation.user_id}`}
+
+                      </p>
+
+                      <p className="text-xs text-slate-400">
+
+                        {reservation.brand_name ||
+                          "Medicine"}
+
+                        {" × "}
+
+                        {reservation.quantity}
+
+                      </p>
+
+                    </div>
+
+
+                    <Badge
+                      label={
+                        String(
+                          reservation.status ||
+                          "pending"
+                        )
+                          .charAt(0)
+                          .toUpperCase() +
+                        String(
+                          reservation.status ||
+                          "pending"
+                        ).slice(1)
+                      }
+                      variant={
+                        String(
+                          reservation.status
+                        ).toLowerCase() ===
+                        "pending"
+                          ? "yellow"
+                          : String(
+                              reservation.status
+                            ).toLowerCase() ===
+                            "approved"
+                            ? "blue"
+                            : String(
+                                reservation.status
+                              ).toLowerCase() ===
+                              "completed"
+                              ? "green"
+                              : "red"
+                      }
+                    />
+
+                  </div>
+
+                )
+              )}
+
+            </div>
+
+          )}
+
         </div>
 
-        {/* Recent reservations */}
+
+        {/* ======================================
+            INVENTORY OVERVIEW
+        ====================================== */}
+
         <div className="bg-white rounded-2xl p-5 shadow-sm border border-black/5">
+
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-bold text-slate-800">Recent Reservations</h3>
-            <button onClick={() => setPage("pharmacy-reservations")} className="text-xs text-blue-600 hover:underline">View All</button>
+
+            <h3 className="font-bold text-slate-800">
+              Inventory Overview
+            </h3>
+
+            <button
+              onClick={() =>
+                setPage(
+                  "pharmacy-inventory"
+                )
+              }
+              className="text-xs text-blue-600 hover:underline"
+            >
+              Manage Inventory
+            </button>
+
           </div>
-          <div className="space-y-3">
-            {RESERVATIONS.slice(0, 4).map(r => (
-              <div key={r.id} className="flex items-center justify-between py-2 border-b border-slate-50 last:border-0">
-                <div>
-                  <p className="text-sm font-semibold text-slate-800">{r.patient}</p>
-                  <p className="text-xs text-slate-400">{r.medicine} × {r.qty}</p>
-                </div>
-                <Badge
-                  label={r.status}
-                  variant={r.status === "Pending" ? "yellow" : r.status === "Approved" ? "blue" : r.status === "Completed" ? "green" : "red"}
-                />
-              </div>
-            ))}
-          </div>
+
+
+          {inventory.length === 0 ? (
+
+            <div className="text-center py-8">
+
+              <Package
+                size={32}
+                className="mx-auto text-slate-300 mb-2"
+              />
+
+              <p className="text-sm text-slate-400">
+                No medicines in inventory
+              </p>
+
+              <button
+                onClick={() =>
+                  setPage(
+                    "pharmacy-inventory"
+                  )
+                }
+                className="mt-3 text-xs text-blue-600 font-semibold hover:underline"
+              >
+                Add your first medicine
+              </button>
+
+            </div>
+
+          ) : (
+
+            <div className="space-y-3">
+
+              {inventory
+                .slice(0, 5)
+                .map(item => (
+
+                  <div
+                    key={item.id}
+                    className="flex items-center justify-between py-2 border-b border-slate-50 last:border-0"
+                  >
+
+                    <div>
+
+                      <p className="text-sm font-semibold text-slate-800">
+                        {item.brand_name}
+                      </p>
+
+                      <p className="text-xs text-slate-400">
+                        {item.generic_name || ""}
+                      </p>
+
+                    </div>
+
+
+                    <div className="text-right">
+
+                      <p className="text-sm font-semibold text-slate-700">
+                        {item.stock} units
+                      </p>
+
+                      <p className="text-xs text-blue-600">
+                        ৳
+                        {Number(
+                          item.price || 0
+                        ).toFixed(2)}
+                      </p>
+
+                    </div>
+
+                  </div>
+
+                ))}
+
+            </div>
+
+          )}
+
         </div>
+
       </div>
+
+
+      {/* ========================================
+          REFRESH
+      ======================================== */}
+
+      <div className="flex justify-end">
+
+        <button
+          onClick={loadDashboard}
+          className="px-4 py-2 border border-slate-200 bg-white rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-50"
+        >
+          Refresh Dashboard
+        </button>
+
+      </div>
+
     </div>
   );
 }
