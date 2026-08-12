@@ -277,28 +277,25 @@ function Sidebar({ panel, page, setPage, setPanel }: { panel: Panel; page: Page;
         ))}
       </nav>
 
-      <div className="p-4 border-t border-black/5 space-y-2">
-        {panel !== "admin" && (
-          <button
-            onClick={() => { setPage("admin-dashboard"); setPanel("admin"); }}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-purple-600 hover:bg-purple-50 transition-all"
-          >
-            <Shield size={18} />Admin Panel
-          </button>
-        )}
-        <button
-          onClick={() => { setPage("home"); setPanel("public"); }}
-          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-500 hover:bg-slate-50 transition-all"
-        >
-          <LogOut size={18} />Sign Out
-        </button>
-      </div>
+        <div className="p-4 border-t border-black/5 space-y-2">
+            <button
+                onClick={() => {
+                    setPage("home");
+                    setPanel("public");
+                }}
+                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-500 hover:bg-slate-50 transition-all"
+            >
+                <LogOut size={18} />
+                Sign Out
+            </button>
+        </div>
     </aside>
   );
 }
 
 function DashboardNav({ panel }: { panel: Panel }) {
   const user = JSON.parse(localStorage.getItem("user") || "{}");
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
 
   const labels = {
     public: "",
@@ -314,16 +311,92 @@ function DashboardNav({ panel }: { panel: Panel }) {
           <Bell size={20} className="text-slate-500" />
           <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
         </button>
-        <div className="flex items-center gap-2 cursor-pointer">
-          <div className="w-9 h-9 rounded-xl bg-blue-100 flex items-center justify-center">
-            <User size={18} className="text-blue-600" />
+          <div className="relative">
+            <button
+              onClick={() => setShowProfileMenu(!showProfileMenu)}
+              className="flex items-center gap-2 hover:bg-slate-50 rounded-xl px-2 py-1.5 transition-colors"
+            >
+              <div className="w-9 h-9 rounded-xl bg-blue-100 flex items-center justify-center">
+                <User size={18} className="text-blue-600" />
+              </div>
+
+              <div className="text-sm text-left">
+                <p className="font-semibold text-slate-800">
+                  {labels[panel]}
+                </p>
+
+                <p className="text-xs text-slate-400 capitalize">
+                  {panel === "public" ? "" : panel + " account"}
+                </p>
+              </div>
+
+              <ChevronDown
+                size={16}
+                className={`text-slate-400 transition-transform ${
+                  showProfileMenu ? "rotate-180" : ""
+                }`}
+              />
+            </button>
+
+            {showProfileMenu && (
+              <div className="absolute right-0 top-full mt-2 w-60 bg-white rounded-xl shadow-xl border border-slate-100 z-50 overflow-hidden">
+
+                {/* User Info */}
+                <div className="px-4 py-3 border-b border-slate-100">
+                  <p className="font-semibold text-slate-800 text-sm">
+                    {user.full_name || "User"}
+                  </p>
+
+                  <p className="text-xs text-slate-400 truncate">
+                    {user.email || ""}
+                  </p>
+                </div>
+
+                {/* Profile */}
+                <button
+                  onClick={() => {
+                    setShowProfileMenu(false);
+                  }}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-sm text-slate-600 hover:bg-slate-50"
+                >
+                  <User size={17} />
+                  My Profile
+                </button>
+
+                {/* Settings */}
+                <button
+                  onClick={() => {
+                    setShowProfileMenu(false);
+                    window.dispatchEvent(new CustomEvent("navigate-settings"));
+                  }}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-sm text-slate-600 hover:bg-slate-50"
+                >
+                  <Settings size={17} />
+                  Settings
+                </button>
+
+                <div className="border-t border-slate-100" />
+
+                {/* Sign Out */}
+                <button
+                  onClick={() => {
+                    localStorage.removeItem("token");
+                    localStorage.removeItem("user");
+                    localStorage.removeItem("role");
+
+                    setShowProfileMenu(false);
+
+                    window.location.reload();
+                  }}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-sm text-red-500 hover:bg-red-50"
+                >
+                  <LogOut size={17} />
+                  Sign Out
+                </button>
+
+              </div>
+            )}
           </div>
-          <div className="text-sm">
-            <p className="font-semibold text-slate-800">{labels[panel]}</p>
-            <p className="text-xs text-slate-400 capitalize">{panel === "public" ? "" : panel + " account"}</p>
-          </div>
-          <ChevronDown size={16} className="text-slate-400" />
-        </div>
       </div>
     </header>
   );
@@ -1413,94 +1486,638 @@ function ForgotPasswordPage({ setPage }: { setPage: (p: Page) => void }) {
   );
 }
 
-function UserDashboard({ setPage }: { setPage: (p: Page) => void }) {
-  const user = JSON.parse(localStorage.getItem("user") || "{}");
+function UserDashboard({
+  setPage
+}: {
+  setPage: (p: Page) => void;
+}) {
+  const [user, setUser] = useState<any>({});
+  const [reservations, setReservations] = useState<any[]>([]);
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const [savedPharmacies, setSavedPharmacies] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // ==========================================
+  // LOAD USER
+  // ==========================================
+
+  useEffect(() => {
+    try {
+      const savedUser =
+        JSON.parse(localStorage.getItem("user") || "{}");
+
+      setUser(savedUser);
+    } catch (error) {
+      console.error("Failed to load user:", error);
+      setUser({});
+    }
+  }, []);
+
+  // ==========================================
+  // LOAD DASHBOARD DATA
+  // ==========================================
+
+  const loadDashboard = async () => {
+    try {
+      setLoading(true);
+
+      const savedUser = JSON.parse(
+        localStorage.getItem("user") || "{}"
+      );
+
+      if (!savedUser?.id) {
+        console.warn("No logged-in user found.");
+        return;
+      }
+
+      // ========================================
+      // RESERVATIONS
+      // ========================================
+
+      try {
+        const reservationResponse = await api.get(
+          `/reservations/user/${savedUser.id}`
+        );
+
+        console.log(
+          "USER RESERVATIONS:",
+          reservationResponse.data
+        );
+
+        if (reservationResponse.data?.success) {
+          setReservations(
+            reservationResponse.data.reservations || []
+          );
+        } else {
+          setReservations([]);
+        }
+      } catch (error: any) {
+        console.error(
+          "Failed to load reservations:",
+          error.response?.data || error
+        );
+
+        setReservations([]);
+      }
+
+      // ========================================
+      // RECENT SEARCHES
+      // ========================================
+
+      try {
+        const searches = JSON.parse(
+          localStorage.getItem("recentSearches") || "[]"
+        );
+
+        setRecentSearches(
+          Array.isArray(searches)
+            ? searches.slice(0, 5)
+            : []
+        );
+      } catch {
+        setRecentSearches([]);
+      }
+
+      // ========================================
+      // SAVED PHARMACIES
+      // ========================================
+
+      try {
+        const saved = JSON.parse(
+          localStorage.getItem("savedPharmacies") || "[]"
+        );
+
+        setSavedPharmacies(
+          Array.isArray(saved)
+            ? saved
+            : []
+        );
+      } catch {
+        setSavedPharmacies([]);
+      }
+
+    } catch (error) {
+      console.error(
+        "Dashboard loading error:",
+        error
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ==========================================
+  // LOAD WHEN DASHBOARD OPENS
+  // ==========================================
+
+  useEffect(() => {
+    loadDashboard();
+  }, []);
+
+  // ==========================================
+  // RESERVATION STATISTICS
+  // ==========================================
+
+  const activeReservations =
+    reservations.filter((reservation) => {
+      const status =
+        String(
+          reservation.status || ""
+        ).toLowerCase();
+
+      return (
+        status === "pending" ||
+        status === "approved" ||
+        status === "ready"
+      );
+    });
+
+  const readyReservations =
+    reservations.filter((reservation) => {
+      const status =
+        String(
+          reservation.status || ""
+        ).toLowerCase();
+
+      return (
+        status === "ready" ||
+        status === "approved"
+      );
+    });
+
+  // ==========================================
+  // LAST SEARCH
+  // ==========================================
+
+  const lastSearch =
+    recentSearches.length > 0
+      ? recentSearches[0]
+      : "No searches yet";
+
+  // ==========================================
+  // QUICK SEARCH
+  // ==========================================
+
+  const [searchText, setSearchText] =
+    useState("");
+
+  const handleQuickSearch = () => {
+    const search = searchText.trim();
+
+    if (!search) {
+      setPage("medicine-search");
+      return;
+    }
+
+    // Save search locally
+    try {
+      const oldSearches = JSON.parse(
+        localStorage.getItem("recentSearches") || "[]"
+      );
+
+      const updatedSearches = [
+        search,
+        ...oldSearches.filter(
+          (item: string) =>
+            item.toLowerCase() !==
+            search.toLowerCase()
+        )
+      ].slice(0, 10);
+
+      localStorage.setItem(
+        "recentSearches",
+        JSON.stringify(updatedSearches)
+      );
+
+      setRecentSearches(
+        updatedSearches.slice(0, 5)
+      );
+    } catch (error) {
+      console.error(
+        "Failed to save search:",
+        error
+      );
+    }
+
+    setPage("medicine-search");
+  };
+
+  // ==========================================
+  // LOADING
+  // ==========================================
+
+  if (loading) {
+    return (
+      <div className="p-6">
+        <div className="bg-white rounded-2xl p-10 text-center shadow-sm border border-black/5">
+          <div className="inline-block w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-3" />
+
+          <p className="text-sm text-slate-500">
+            Loading dashboard...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // ==========================================
+  // DASHBOARD
+  // ==========================================
+
   return (
     <div className="p-6 space-y-6">
+
+      {/* ========================================
+          HEADER
+      ======================================== */}
+
       <div>
-        <h1 className="text-2xl font-bold text-slate-800">Good Morning, {user.full_name}! 👋</h1>
-        <p className="text-slate-500 text-sm mt-1">Find your medicine, compare prices, and stay healthy.</p>
+        <h1 className="text-2xl font-bold text-slate-800">
+          Good Morning, {user?.full_name || "User"}! 👋
+        </h1>
+
+        <p className="text-slate-500 text-sm mt-1">
+          Find your medicine, compare prices,
+          and stay healthy.
+        </p>
       </div>
 
-      {/* Quick search */}
+      {/* ========================================
+          QUICK SEARCH
+      ======================================== */}
+
       <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-2xl p-6 text-white">
-        <p className="font-semibold mb-3">Quick Medicine Search</p>
+
+        <p className="font-semibold mb-3">
+          Quick Medicine Search
+        </p>
+
         <div className="flex gap-3">
+
           <div className="flex-1 bg-white/20 rounded-xl flex items-center gap-3 px-4 py-3">
-            <Search size={18} className="text-blue-100" />
-            <input className="flex-1 bg-transparent text-white placeholder:text-blue-200 text-sm outline-none" placeholder="Search medicine by name..." />
+
+            <Search
+              size={18}
+              className="text-blue-100"
+            />
+
+            <input
+              value={searchText}
+              onChange={(e) =>
+                setSearchText(e.target.value)
+              }
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  handleQuickSearch();
+                }
+              }}
+              className="flex-1 bg-transparent text-white placeholder:text-blue-200 text-sm outline-none"
+              placeholder="Search medicine by name..."
+            />
+
           </div>
-          <button onClick={() => setPage("medicine-search")} className="px-6 py-3 bg-white text-blue-600 rounded-xl font-semibold text-sm hover:bg-blue-50 transition-colors">
+
+          <button
+            onClick={handleQuickSearch}
+            className="px-6 py-3 bg-white text-blue-600 rounded-xl font-semibold text-sm hover:bg-blue-50 transition-colors"
+          >
             Search
           </button>
+
         </div>
       </div>
+
+      {/* ========================================
+          STATISTICS
+      ======================================== */}
 
       <div className="grid grid-cols-3 gap-5">
-        <StatCard icon={Search} label="Searches Today" value="0" sub="Last: Napa Extra" color="bg-blue-500" />
-        <StatCard icon={ShoppingBag} label="Active Reservations" value="2" sub="1 ready for pickup" color="bg-green-500" />
-        <StatCard icon={Star} label="Saved Pharmacies" value="4" sub="Dhaka Medical is nearest" color="bg-amber-500" />
+
+        <StatCard
+          icon={Search}
+          label="Searches"
+          value={String(recentSearches.length)}
+          sub={
+            lastSearch === "No searches yet"
+              ? "No searches yet"
+              : `Last: ${lastSearch}`
+          }
+          color="bg-blue-500"
+        />
+
+        <StatCard
+          icon={ShoppingBag}
+          label="Active Reservations"
+          value={String(activeReservations.length)}
+          sub={
+            readyReservations.length > 0
+              ? `${readyReservations.length} ready`
+              : "No reservations ready"
+          }
+          color="bg-green-500"
+        />
+
+        <StatCard
+          icon={Star}
+          label="Saved Pharmacies"
+          value={String(savedPharmacies.length)}
+          sub={
+            savedPharmacies.length > 0
+              ? "Your saved pharmacies"
+              : "No pharmacies saved"
+          }
+          color="bg-amber-500"
+        />
+
       </div>
 
+      {/* ========================================
+          RECENT SEARCHES + RESERVATIONS
+      ======================================== */}
+
       <div className="grid grid-cols-2 gap-5">
-        {/* Recent searches */}
+
+        {/* RECENT SEARCHES */}
+
         <div className="bg-white rounded-2xl p-5 shadow-sm border border-black/5">
-          <h3 className="font-bold text-slate-800 mb-4">Recent Searches</h3>
-          <div className="space-y-3">
-            {[].map(m => (
-              <div key={m} className="flex items-center justify-between py-2 border-b border-slate-50 last:border-0">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
-                    <Pill size={14} className="text-blue-400" />
-                  </div>
-                  <span className="text-sm font-medium text-slate-700">{m}</span>
-                </div>
-                <button onClick={() => setPage("medicine-details")} className="text-xs text-blue-600 hover:underline">View</button>
-              </div>
-            ))}
+
+          <div className="flex items-center justify-between mb-4">
+
+            <h3 className="font-bold text-slate-800">
+              Recent Searches
+            </h3>
+
+            <button
+              onClick={() =>
+                setPage("medicine-search")
+              }
+              className="text-xs text-blue-600 hover:underline"
+            >
+              Search Medicine
+            </button>
+
           </div>
+
+          {recentSearches.length === 0 ? (
+
+            <div className="py-8 text-center">
+
+              <Search
+                size={32}
+                className="mx-auto text-slate-300 mb-3"
+              />
+
+              <p className="text-sm text-slate-500">
+                No recent searches
+              </p>
+
+            </div>
+
+          ) : (
+
+            <div className="space-y-3">
+
+              {recentSearches.map(
+                (medicine, index) => (
+
+                  <div
+                    key={`${medicine}-${index}`}
+                    className="flex items-center justify-between py-2 border-b border-slate-50 last:border-0"
+                  >
+
+                    <div className="flex items-center gap-3">
+
+                      <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
+
+                        <Pill
+                          size={14}
+                          className="text-blue-400"
+                        />
+
+                      </div>
+
+                      <span className="text-sm font-medium text-slate-700">
+                        {medicine}
+                      </span>
+
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        setSearchText(medicine);
+                        setPage("medicine-search");
+                      }}
+                      className="text-xs text-blue-600 hover:underline"
+                    >
+                      Search
+                    </button>
+
+                  </div>
+
+                )
+              )}
+
+            </div>
+
+          )}
+
         </div>
 
-        {/* Reserved medicines */}
+        {/* RESERVATIONS */}
+
         <div className="bg-white rounded-2xl p-5 shadow-sm border border-black/5">
+
           <div className="flex items-center justify-between mb-4">
-            <h3 className="font-bold text-slate-800">My Reservations</h3>
+
+            <h3 className="font-bold text-slate-800">
+              My Reservations
+            </h3>
+
             <button
-              onClick={() => setPage("my-reservations")}
+              onClick={() =>
+                setPage("my-reservations")
+              }
               className="text-xs text-blue-600 hover:underline"
             >
               View All
             </button>
+
           </div>
-          <p className="text-sm text-slate-500">
-            View your active reservations and their approval status.
-          </p>
-          <button
-            onClick={() => setPage("my-reservations")}
-            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-semibold"
-          >
-            Open My Reservations
-          </button>
+
+          {reservations.length === 0 ? (
+
+            <div>
+
+              <p className="text-sm text-slate-500">
+                You don't have any reservations yet.
+              </p>
+
+              <button
+                onClick={() =>
+                  setPage("medicine-search")
+                }
+                className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-semibold"
+              >
+                Find Medicine
+              </button>
+
+            </div>
+
+          ) : (
+
+            <div className="space-y-3">
+
+              {reservations
+                .slice(0, 3)
+                .map((reservation) => (
+
+                  <div
+                    key={reservation.id}
+                    className="flex items-center justify-between p-3 rounded-xl bg-slate-50"
+                  >
+
+                    <div>
+
+                      <p className="text-sm font-semibold text-slate-700">
+                        {reservation.medicine_name ||
+                          reservation.brand_name ||
+                          `Reservation #${reservation.id}`}
+                      </p>
+
+                      <p className="text-xs text-slate-400">
+                        {reservation.pharmacy_name ||
+                          "Pharmacy"}
+                      </p>
+
+                    </div>
+
+                    <span
+                      className={`text-xs font-medium px-2.5 py-1 rounded-full ${
+                        String(
+                          reservation.status
+                        ).toLowerCase() === "approved"
+                          ? "bg-green-50 text-green-600"
+                          : String(
+                              reservation.status
+                            ).toLowerCase() === "pending"
+                          ? "bg-yellow-50 text-yellow-600"
+                          : "bg-slate-100 text-slate-600"
+                      }`}
+                    >
+                      {reservation.status || "Pending"}
+                    </span>
+
+                  </div>
+
+                ))}
+
+            </div>
+
+          )}
+
         </div>
+
       </div>
 
-      {/* Favorite pharmacies */}
+      {/* ========================================
+          FAVORITE PHARMACIES
+      ======================================== */}
+
       <div className="bg-white rounded-2xl p-5 shadow-sm border border-black/5">
-        <h3 className="font-bold text-slate-800 mb-4">Favorite Pharmacies</h3>
-        <div className="grid grid-cols-4 gap-4">
-          {[].map(ph => (
-            <div key={ph.id} className="p-4 rounded-xl border border-slate-100 hover:border-blue-200 transition-colors cursor-pointer">
-              <Building2 size={20} className="text-green-500 mb-2" />
-              <p className="text-sm font-semibold text-slate-800">{ph.name}</p>
-              <p className="text-xs text-slate-400">{ph.distance} away</p>
-              <p className="text-xs text-green-600 mt-1">{ph.hours}</p>
-            </div>
-          ))}
+
+        <div className="flex items-center justify-between mb-4">
+
+          <h3 className="font-bold text-slate-800">
+            Favorite Pharmacies
+          </h3>
+
+          <button
+            onClick={() =>
+              setPage("pharmacy-locator")
+            }
+            className="text-xs text-blue-600 hover:underline"
+          >
+            Find Pharmacies
+          </button>
+
         </div>
+
+        {savedPharmacies.length === 0 ? (
+
+          <div className="py-8 text-center">
+
+            <Building2
+              size={32}
+              className="mx-auto text-slate-300 mb-3"
+            />
+
+            <p className="text-sm text-slate-500">
+              No favorite pharmacies yet.
+            </p>
+
+            <button
+              onClick={() =>
+                setPage("pharmacy-locator")
+              }
+              className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-semibold"
+            >
+              Find Pharmacy
+            </button>
+
+          </div>
+
+        ) : (
+
+          <div className="grid grid-cols-4 gap-4">
+
+            {savedPharmacies.map(
+              (pharmacy: any) => (
+
+                <div
+                  key={
+                    pharmacy.id ||
+                    pharmacy.pharmacy_id
+                  }
+                  className="p-4 rounded-xl border border-slate-100 hover:border-blue-200 transition-colors cursor-pointer"
+                >
+
+                  <Building2
+                    size={20}
+                    className="text-green-500 mb-2"
+                  />
+
+                  <p className="text-sm font-semibold text-slate-800">
+                    {pharmacy.name ||
+                      pharmacy.pharmacy_name ||
+                      "Pharmacy"}
+                  </p>
+
+                  <p className="text-xs text-slate-400">
+                    {pharmacy.distance ||
+                      pharmacy.address ||
+                      ""}
+                  </p>
+
+                  <p className="text-xs text-green-600 mt-1">
+                    {pharmacy.hours ||
+                      "Hours unavailable"}
+                  </p>
+
+                </div>
+
+              )
+            )}
+
+          </div>
+
+        )}
+
       </div>
+
     </div>
   );
 }
+
 function MedicineSearchPage({
     setPage,
     setSelectedMedicine
@@ -5162,17 +5779,6 @@ function PharmacyInventory() {
                                         <td className="px-6 py-4">
 
                                             <div className="flex gap-2">
-
-                                                <button
-                                                    onClick={() =>
-                                                        openEditModal(item)
-                                                    }
-                                                    className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600 transition-colors"
-                                                    title="Edit"
-                                                >
-                                                    <Edit2 size={14} />
-                                                </button>
-
 
                                                 <button
                                                     onClick={() =>
@@ -9833,10 +10439,8 @@ return (
 }
 
 // ─── Main App ────────────────────────────────────────────────────────────────
-
 function PharmacyReservations() {
-  const PHARMACY_ID = 1;
-
+  const [pharmacy, setPharmacy] = useState<any>(null);
   const [tab, setTab] = useState("Pending");
   const [reservations, setReservations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -9849,6 +10453,40 @@ function PharmacyReservations() {
   ];
 
   // ==========================================
+  // GET LOGGED-IN PHARMACY
+  // ==========================================
+
+  const getMyPharmacy = async () => {
+    try {
+      const response = await api.get(
+        "/pharmacies/my-pharmacy"
+      );
+
+      const pharmacyData =
+        response.data?.pharmacy;
+
+      if (!pharmacyData?.id) {
+        throw new Error(
+          "Pharmacy information not found."
+        );
+      }
+
+      setPharmacy(pharmacyData);
+
+      return pharmacyData;
+
+    } catch (error: any) {
+      console.error(
+        "Failed to load pharmacy:",
+        error.response?.data || error
+      );
+
+      throw error;
+    }
+  };
+
+
+  // ==========================================
   // LOAD PHARMACY RESERVATIONS
   // ==========================================
 
@@ -9856,8 +10494,21 @@ function PharmacyReservations() {
     try {
       setLoading(true);
 
+      // Get the currently logged-in pharmacy
+      const pharmacyData =
+        await getMyPharmacy();
+
+      const pharmacyId =
+        pharmacyData.id;
+
+      console.log(
+        "Logged-in Pharmacy ID:",
+        pharmacyId
+      );
+
+      // Load only this pharmacy's reservations
       const response = await api.get(
-        `/reservations/pharmacy/${PHARMACY_ID}`
+        `/reservations/pharmacy/${pharmacyId}`
       );
 
       console.log(
@@ -9866,18 +10517,19 @@ function PharmacyReservations() {
       );
 
       setReservations(
-        response.data.reservations || []
+        response.data?.reservations || []
       );
 
     } catch (error: any) {
 
       console.error(
         "Failed to load pharmacy reservations:",
-        error
+        error.response?.data || error
       );
 
       alert(
         error?.response?.data?.message ||
+        error?.message ||
         "Failed to load reservations."
       );
 
@@ -9909,11 +10561,18 @@ function PharmacyReservations() {
 
     try {
 
+      if (!pharmacy?.id) {
+        alert(
+          "Pharmacy information not found."
+        );
+        return;
+      }
+
       await api.patch(
         `/reservations/${id}/status`,
         {
           status,
-          pharmacy_id: PHARMACY_ID
+          pharmacy_id: pharmacy.id
         }
       );
 
@@ -9921,20 +10580,20 @@ function PharmacyReservations() {
         `Reservation ${status}.`
       );
 
+      // Reload after update
       await loadReservations();
 
     } catch (error: any) {
 
       console.error(
         "Reservation status error:",
-        error
+        error.response?.data || error
       );
 
       alert(
         error?.response?.data?.message ||
         "Failed to update reservation."
       );
-
     }
   };
 
@@ -9943,11 +10602,12 @@ function PharmacyReservations() {
   // FILTER
   // ==========================================
 
-  const filtered = reservations.filter(
-    (r) =>
-      String(r.status || "").toLowerCase() ===
-      tab.toLowerCase()
-  );
+  const filtered =
+    reservations.filter(
+      (r) =>
+        String(r.status || "").toLowerCase() ===
+        tab.toLowerCase()
+    );
 
 
   // ==========================================
@@ -9978,6 +10638,10 @@ function PharmacyReservations() {
   };
 
 
+  // ==========================================
+  // UI
+  // ==========================================
+
   return (
     <div className="p-6 space-y-5">
 
@@ -10002,14 +10666,28 @@ function PharmacyReservations() {
           onClick={loadReservations}
           className="flex items-center gap-2 px-4 py-2 border border-slate-200 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-50"
         >
-
           <RefreshCw size={15} />
-
           Refresh
-
         </button>
 
       </div>
+
+
+      {/* CURRENT PHARMACY */}
+
+      {pharmacy && (
+        <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3">
+
+          <p className="text-xs text-blue-500 font-medium">
+            Logged-in Pharmacy
+          </p>
+
+          <p className="text-sm font-bold text-blue-700">
+            {pharmacy.pharmacy_name}
+          </p>
+
+        </div>
+      )}
 
 
       {/* TABS */}
@@ -10043,7 +10721,11 @@ function PharmacyReservations() {
 
           <div className="p-10 text-center text-sm text-slate-500">
 
-            Loading reservations...
+            <div className="inline-block w-7 h-7 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-3" />
+
+            <p>
+              Loading reservations...
+            </p>
 
           </div>
 
@@ -10094,9 +10776,7 @@ function PharmacyReservations() {
                     {/* ID */}
 
                     <td className="px-6 py-4 text-xs font-mono text-slate-400">
-
                       #{r.id}
-
                     </td>
 
 
@@ -10120,15 +10800,11 @@ function PharmacyReservations() {
                     <td className="px-6 py-4">
 
                       <p className="text-sm font-semibold text-slate-700">
-
                         {r.brand_name}
-
                       </p>
 
                       <p className="text-xs text-slate-400">
-
                         {r.generic_name || ""}
-
                       </p>
 
                     </td>
@@ -10137,9 +10813,7 @@ function PharmacyReservations() {
                     {/* QUANTITY */}
 
                     <td className="px-6 py-4 text-sm font-semibold">
-
                       {r.quantity}
-
                     </td>
 
 
@@ -10176,7 +10850,8 @@ function PharmacyReservations() {
                           r.status || "pending"
                         ).replace(
                           /^./,
-                          (c) => c.toUpperCase()
+                          (c) =>
+                            c.toUpperCase()
                         )}
                         variant={statusVariant(
                           r.status
@@ -10205,11 +10880,8 @@ function PharmacyReservations() {
                             }
                             className="px-3 py-1.5 bg-green-600 text-white text-xs rounded-lg font-semibold hover:bg-green-700 flex items-center gap-1"
                           >
-
                             <CheckCircle size={12} />
-
                             Approve
-
                           </button>
 
 
@@ -10222,11 +10894,8 @@ function PharmacyReservations() {
                             }
                             className="px-3 py-1.5 bg-red-100 text-red-600 text-xs rounded-lg font-semibold hover:bg-red-200 flex items-center gap-1"
                           >
-
                             <XCircle size={12} />
-
                             Reject
-
                           </button>
 
                         </div>
@@ -10244,17 +10913,13 @@ function PharmacyReservations() {
                           }
                           className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded-lg font-semibold hover:bg-blue-700"
                         >
-
                           Mark Completed
-
                         </button>
 
                       ) : (
 
                         <span className="text-xs text-slate-400">
-
                           No action
-
                         </span>
 
                       )}
@@ -10282,17 +10947,19 @@ function PharmacyReservations() {
                 />
 
                 <p className="text-sm">
-
                   No {tab.toLowerCase()} reservations
-
                 </p>
 
               </div>
 
             )}
+
           </>
+
         )}
+
       </div>
+
     </div>
   );
 }

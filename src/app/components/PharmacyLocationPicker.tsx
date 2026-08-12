@@ -1,18 +1,173 @@
-
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
-    setOptions,
-    importLibrary,
-} from "@googlemaps/js-api-loader";
+    MapContainer,
+    TileLayer,
+    Marker,
+    useMap,
+    useMapEvents,
+} from "react-leaflet";
+
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
+
+
+// ======================================================
+// PROPS
+// ======================================================
 
 interface PharmacyLocationPickerProps {
     latitude: number | string | null;
     longitude: number | string | null;
+
     onLocationChange: (
         latitude: number,
         longitude: number
     ) => void;
 }
+
+
+// ======================================================
+// DEFAULT MARKER ICON
+// ======================================================
+
+const pharmacyIcon = new L.Icon({
+    iconUrl:
+        "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png",
+
+    iconRetinaUrl:
+        "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png",
+
+    shadowUrl:
+        "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
+
+    iconSize: [25, 41],
+
+    iconAnchor: [12, 41],
+
+    popupAnchor: [1, -34],
+
+    shadowSize: [41, 41],
+});
+
+
+// ======================================================
+// DEFAULT DHAKA LOCATION
+// ======================================================
+
+const DEFAULT_LOCATION: [number, number] = [
+    23.8103,
+    90.4125,
+];
+
+
+// ======================================================
+// MAP CLICK HANDLER
+// ======================================================
+
+interface MapClickHandlerProps {
+    onLocationChange: (
+        latitude: number,
+        longitude: number
+    ) => void;
+}
+
+function MapClickHandler({
+    onLocationChange,
+}: MapClickHandlerProps) {
+
+    useMapEvents({
+
+        click(event) {
+
+            const latitude = event.latlng.lat;
+
+            const longitude = event.latlng.lng;
+
+            console.log(
+                "Selected pharmacy location:",
+                latitude,
+                longitude
+            );
+
+            onLocationChange(
+                latitude,
+                longitude
+            );
+        },
+
+    });
+
+    return null;
+}
+
+
+// ======================================================
+// MAP RESIZE FIX
+// ======================================================
+
+function MapResizeHandler() {
+
+    const map = useMap();
+
+    useEffect(() => {
+
+        const timer = setTimeout(() => {
+
+            map.invalidateSize();
+
+        }, 200);
+
+        return () => clearTimeout(timer);
+
+    }, [map]);
+
+    return null;
+}
+
+
+// ======================================================
+// MAP CENTER CONTROL
+// ======================================================
+
+interface MapCenterProps {
+    latitude: number;
+    longitude: number;
+}
+
+function MapCenter({
+    latitude,
+    longitude,
+}: MapCenterProps) {
+
+    const map = useMap();
+
+    useEffect(() => {
+
+        if (
+            Number.isFinite(latitude) &&
+            Number.isFinite(longitude)
+        ) {
+
+            map.setView(
+                [latitude, longitude],
+                Math.max(map.getZoom(), 16)
+            );
+
+        }
+
+    }, [
+        latitude,
+        longitude,
+        map,
+    ]);
+
+    return null;
+}
+
+
+// ======================================================
+// MAIN COMPONENT
+// ======================================================
 
 export default function PharmacyLocationPicker({
     latitude,
@@ -20,214 +175,40 @@ export default function PharmacyLocationPicker({
     onLocationChange,
 }: PharmacyLocationPickerProps) {
 
-    const mapRef =
-        useRef<HTMLDivElement | null>(null);
-
-    const mapInstance =
-        useRef<google.maps.Map | null>(null);
-
-    const markerInstance =
-        useRef<google.maps.marker.AdvancedMarkerElement | null>(
-            null
-        );
-
-    const [loading, setLoading] =
-        useState(true);
-
     const [locationLoading, setLocationLoading] =
         useState(false);
 
-    useEffect(() => {
 
-        let cancelled = false;
+    // ==================================================
+    // CHECK SAVED LOCATION
+    // ==================================================
 
-        const initializeMap = async () => {
+    const hasSavedLocation =
+        latitude !== null &&
+        latitude !== undefined &&
+        longitude !== null &&
+        longitude !== undefined &&
+        Number.isFinite(Number(latitude)) &&
+        Number.isFinite(Number(longitude));
 
-            try {
 
-                const apiKey =
-                    import.meta.env
-                        .VITE_GOOGLE_MAPS_API_KEY;
+    // ==================================================
+    // CURRENT LOCATION
+    // ==================================================
 
-                if (!apiKey) {
+    const selectedLatitude = hasSavedLocation
+        ? Number(latitude)
+        : DEFAULT_LOCATION[0];
 
-                    console.error(
-                        "Google Maps API key is missing."
-                    );
 
-                    setLoading(false);
+    const selectedLongitude = hasSavedLocation
+        ? Number(longitude)
+        : DEFAULT_LOCATION[1];
 
-                    return;
-                }
 
-                setOptions({
-                    key: apiKey,
-                    v: "weekly",
-                });
-
-                const [
-                    { Map },
-                    { AdvancedMarkerElement },
-                ] = await Promise.all([
-                    importLibrary("maps"),
-                    importLibrary("marker"),
-                ]);
-
-                if (
-                    !mapRef.current ||
-                    cancelled
-                ) {
-                    return;
-                }
-
-                // ==========================================
-                // INITIAL LOCATION
-                // ==========================================
-
-                const hasSavedLocation =
-                    latitude !== null &&
-                    longitude !== null &&
-                    latitude !== undefined &&
-                    longitude !== undefined &&
-                    !Number.isNaN(
-                        Number(latitude)
-                    ) &&
-                    !Number.isNaN(
-                        Number(longitude)
-                    );
-
-                const initialLocation = hasSavedLocation
-                    ? {
-                        lat: Number(latitude),
-                        lng: Number(longitude),
-                    }
-                    : {
-                        lat: 23.8103,
-                        lng: 90.4125,
-                    };
-
-                // ==========================================
-                // CREATE MAP
-                // ==========================================
-
-                const map = new Map(
-                    mapRef.current,
-                    {
-                        center: initialLocation,
-                        zoom: hasSavedLocation
-                            ? 16
-                            : 12,
-
-                        mapId: "DEMO_MAP_ID",
-
-                        fullscreenControl: true,
-
-                        streetViewControl: false,
-
-                        mapTypeControl: false,
-                    }
-                );
-
-                mapInstance.current = map;
-
-                // ==========================================
-                // CREATE MARKER IF LOCATION EXISTS
-                // ==========================================
-
-                if (hasSavedLocation) {
-
-                    markerInstance.current =
-                        new AdvancedMarkerElement({
-                            map,
-                            position: initialLocation,
-                            title:
-                                "Pharmacy Location",
-                        });
-
-                }
-
-                // ==========================================
-                // CLICK MAP TO SELECT LOCATION
-                // ==========================================
-
-                map.addListener(
-                    "click",
-                    (event: google.maps.MapMouseEvent) => {
-
-                        if (!event.latLng) {
-                            return;
-                        }
-
-                        const newLatitude =
-                            event.latLng.lat();
-
-                        const newLongitude =
-                            event.latLng.lng();
-
-                        // Remove previous marker
-
-                        if (
-                            markerInstance.current
-                        ) {
-
-                            markerInstance.current.map =
-                                null;
-
-                        }
-
-                        // Create new marker
-
-                        markerInstance.current =
-                            new AdvancedMarkerElement({
-                                map,
-
-                                position: {
-                                    lat: newLatitude,
-                                    lng: newLongitude,
-                                },
-
-                                title:
-                                    "Selected Pharmacy Location",
-                            });
-
-                        // Send location to parent
-
-                        onLocationChange(
-                            newLatitude,
-                            newLongitude
-                        );
-
-                    }
-                );
-
-                setLoading(false);
-
-            } catch (error) {
-
-                console.error(
-                    "Failed to initialize location picker:",
-                    error
-                );
-
-                setLoading(false);
-
-            }
-
-        };
-
-        initializeMap();
-
-        return () => {
-
-            cancelled = true;
-
-        };
-
-    }, []);
-
-    // ==========================================
-    // USE CURRENT LOCATION
-    // ==========================================
+    // ==================================================
+    // USE MY LOCATION
+    // ==================================================
 
     const useCurrentLocation = () => {
 
@@ -238,10 +219,11 @@ export default function PharmacyLocationPicker({
             );
 
             return;
-
         }
 
+
         setLocationLoading(true);
+
 
         navigator.geolocation.getCurrentPosition(
 
@@ -253,68 +235,21 @@ export default function PharmacyLocationPicker({
                 const newLongitude =
                     position.coords.longitude;
 
-                const newLocation = {
-                    lat: newLatitude,
-                    lng: newLongitude,
-                };
 
-                // Move map
-
-                if (mapInstance.current) {
-
-                    mapInstance.current.setCenter(
-                        newLocation
-                    );
-
-                    mapInstance.current.setZoom(
-                        17
-                    );
-
-                }
-
-                // Remove old marker
-
-                if (
-                    markerInstance.current
-                ) {
-
-                    markerInstance.current.map =
-                        null;
-
-                }
-
-                // Create marker
-
-                importLibrary("marker").then(
-                    ({ AdvancedMarkerElement }) => {
-
-                        if (
-                            !mapInstance.current
-                        ) {
-                            return;
-                        }
-
-                        markerInstance.current =
-                            new AdvancedMarkerElement({
-                                map:
-                                    mapInstance.current,
-
-                                position:
-                                    newLocation,
-
-                                title:
-                                    "Pharmacy Store Location",
-                            });
-
-                    }
+                console.log(
+                    "Current pharmacy location:",
+                    newLatitude,
+                    newLongitude
                 );
 
-                // Send location
+
+                // Save location to parent
 
                 onLocationChange(
                     newLatitude,
                     newLongitude
                 );
+
 
                 setLocationLoading(false);
 
@@ -327,9 +262,31 @@ export default function PharmacyLocationPicker({
                     error
                 );
 
-                alert(
-                    "Unable to get your current location. Please allow location access."
-                );
+
+                let message =
+                    "Unable to get your current location.";
+
+
+                if (error.code === 1) {
+
+                    message =
+                        "Location permission was denied. Please allow location access in your browser.";
+
+                } else if (error.code === 2) {
+
+                    message =
+                        "Your location could not be determined.";
+
+                } else if (error.code === 3) {
+
+                    message =
+                        "Location request timed out. Please try again.";
+
+                }
+
+
+                alert(message);
+
 
                 setLocationLoading(false);
 
@@ -338,18 +295,32 @@ export default function PharmacyLocationPicker({
             {
                 enableHighAccuracy: true,
 
-                timeout: 10000,
+                timeout: 15000,
 
                 maximumAge: 0,
             }
-
         );
-
     };
+
+
+    // ==================================================
+    // LOCATION ARRAY
+    // ==================================================
+
+    const mapCenter: [number, number] = [
+        selectedLatitude,
+        selectedLongitude,
+    ];
+
+
+    // ==================================================
+    // RENDER
+    // ==================================================
 
     return (
 
         <div className="space-y-3">
+
 
             {/* ==========================================
                 HEADER
@@ -359,26 +330,32 @@ export default function PharmacyLocationPicker({
 
                 <div>
 
-                    <label className="
-                        text-xs
-                        font-semibold
-                        text-slate-400
-                        uppercase
-                        tracking-wide
-                    ">
+                    <label
+                        className="
+                            text-xs
+                            font-semibold
+                            text-slate-400
+                            uppercase
+                            tracking-wide
+                        "
+                    >
                         Store Location
                     </label>
 
-                    <p className="
-                        text-xs
-                        text-slate-400
-                        mt-1
-                    ">
-                        Click on the map to select your
-                        pharmacy location.
+
+                    <p
+                        className="
+                            text-xs
+                            text-slate-400
+                            mt-1
+                        "
+                    >
+                        Click anywhere on the map to select
+                        your pharmacy location.
                     </p>
 
                 </div>
+
 
                 <button
                     type="button"
@@ -394,6 +371,8 @@ export default function PharmacyLocationPicker({
                         font-semibold
                         hover:bg-green-700
                         disabled:opacity-50
+                        disabled:cursor-not-allowed
+                        transition
                     "
                 >
 
@@ -405,163 +384,204 @@ export default function PharmacyLocationPicker({
 
             </div>
 
+
             {/* ==========================================
                 MAP
             ========================================== */}
 
-            <div className="
-                relative
-                w-full
-                h-[350px]
-                rounded-2xl
-                overflow-hidden
-                border
-                border-slate-200
-            ">
+            <div
+                className="
+                    relative
+                    w-full
+                    h-[350px]
+                    rounded-2xl
+                    overflow-hidden
+                    border
+                    border-slate-200
+                "
+            >
 
-                <div
-                    ref={mapRef}
+                <MapContainer
+                    center={mapCenter}
+                    zoom={hasSavedLocation ? 16 : 12}
+                    scrollWheelZoom={true}
                     className="w-full h-full"
-                />
+                >
 
-                {loading && (
+                    {/* OpenStreetMap */}
 
-                    <div className="
-                        absolute
-                        inset-0
-                        flex
-                        items-center
-                        justify-center
-                        bg-white/80
-                    ">
+                    <TileLayer
+                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    />
 
-                        <div className="text-center">
 
-                            <div className="
-                                animate-spin
-                                w-8
-                                h-8
-                                border-4
-                                border-blue-500
-                                border-t-transparent
-                                rounded-full
-                                mx-auto
-                                mb-3
-                            " />
+                    {/* Fix map size */}
 
-                            <p className="
-                                text-sm
-                                text-slate-500
-                            ">
-                                Loading map...
-                            </p>
+                    <MapResizeHandler />
 
-                        </div>
 
-                    </div>
+                    {/* Update center */}
 
-                )}
+                    <MapCenter
+                        latitude={selectedLatitude}
+                        longitude={selectedLongitude}
+                    />
+
+
+                    {/* Click map */}
+
+                    <MapClickHandler
+                        onLocationChange={
+                            onLocationChange
+                        }
+                    />
+
+
+                    {/* Selected pharmacy marker */}
+
+                    {hasSavedLocation && (
+
+                        <Marker
+                            position={[
+                                selectedLatitude,
+                                selectedLongitude,
+                            ]}
+                            icon={pharmacyIcon}
+                        />
+
+                    )}
+
+                </MapContainer>
 
             </div>
+
 
             {/* ==========================================
                 COORDINATES
             ========================================== */}
 
-            <div className="
-                grid
-                grid-cols-2
-                gap-3
-            ">
+            <div
+                className="
+                    grid
+                    grid-cols-2
+                    gap-3
+                "
+            >
 
-                <div className="
-                    bg-slate-50
-                    rounded-xl
-                    p-3
-                ">
+                {/* Latitude */}
 
-                    <p className="
-                        text-[10px]
-                        uppercase
-                        font-semibold
-                        text-slate-400
-                    ">
+                <div
+                    className="
+                        bg-slate-50
+                        rounded-xl
+                        p-3
+                    "
+                >
+
+                    <p
+                        className="
+                            text-[10px]
+                            uppercase
+                            font-semibold
+                            text-slate-400
+                        "
+                    >
                         Latitude
                     </p>
 
-                    <p className="
-                        text-sm
-                        font-semibold
-                        text-slate-700
-                        mt-1
-                    ">
-                        {latitude !== null &&
-                        latitude !== undefined
-                            ? Number(latitude).toFixed(6)
+
+                    <p
+                        className="
+                            text-sm
+                            font-semibold
+                            text-slate-700
+                            mt-1
+                        "
+                    >
+
+                        {hasSavedLocation
+                            ? selectedLatitude.toFixed(8)
                             : "Not selected"}
+
                     </p>
 
                 </div>
 
-                <div className="
-                    bg-slate-50
-                    rounded-xl
-                    p-3
-                ">
 
-                    <p className="
-                        text-[10px]
-                        uppercase
-                        font-semibold
-                        text-slate-400
-                    ">
+                {/* Longitude */}
+
+                <div
+                    className="
+                        bg-slate-50
+                        rounded-xl
+                        p-3
+                    "
+                >
+
+                    <p
+                        className="
+                            text-[10px]
+                            uppercase
+                            font-semibold
+                            text-slate-400
+                        "
+                    >
                         Longitude
                     </p>
 
-                    <p className="
-                        text-sm
-                        font-semibold
-                        text-slate-700
-                        mt-1
-                    ">
-                        {longitude !== null &&
-                        longitude !== undefined
-                            ? Number(longitude).toFixed(6)
+
+                    <p
+                        className="
+                            text-sm
+                            font-semibold
+                            text-slate-700
+                            mt-1
+                        "
+                    >
+
+                        {hasSavedLocation
+                            ? selectedLongitude.toFixed(8)
                             : "Not selected"}
+
                     </p>
 
                 </div>
 
             </div>
 
+
             {/* ==========================================
                 INSTRUCTION
             ========================================== */}
 
-            <div className="
-                bg-blue-50
-                border
-                border-blue-100
-                rounded-xl
-                p-3
-            ">
+            <div
+                className="
+                    bg-blue-50
+                    border
+                    border-blue-100
+                    rounded-xl
+                    p-3
+                "
+            >
 
-                <p className="
-                    text-xs
-                    text-blue-700
-                ">
+                <p
+                    className="
+                        text-xs
+                        text-blue-700
+                    "
+                >
 
-                    💡 <strong>Tip:</strong> Open this page
-                    while you are at your pharmacy and
+                    💡 <strong>Tip:</strong> The pharmacist can
+                    open this page inside their pharmacy and
                     click <strong>Use My Location</strong>.
-                    This will save your store's exact
-                    location.
+                    MediFind BD will save the exact GPS
+                    coordinates of the store.
 
                 </p>
 
             </div>
 
         </div>
-
     );
 }
