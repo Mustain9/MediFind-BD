@@ -25,6 +25,7 @@ type Page =
   | "pharmacy-reservations"
   | "pharmacy-profile"
   | "admin-dashboard"
+  | "admin-user-management"
   | "admin-pharmacy-approval"
   | "admin-medicine-management"
   | "reports"
@@ -178,7 +179,7 @@ function Sidebar({ panel, page, setPage, setPanel }: { panel: Panel; page: Page;
     { icon: Home, label: "Dashboard", page: "admin-dashboard" as Page },
     { icon: Building2, label: "Pharmacy Approval", page: "admin-pharmacy-approval" as Page },
     { icon: Pill, label: "Medicine Master", page: "admin-medicine-management" as Page },
-    { icon: Users, label: "User Management", page: "admin-dashboard" as Page },
+    { icon: Users, label: "User Management", page: "admin-user-management" as Page },
     { icon: BarChart3, label: "Reports", page: "reports" as Page },
     { icon: Settings, label: "Settings", page: "settings" as Page },
   ];
@@ -7248,6 +7249,466 @@ function AdminDashboard({
   );
 }
 
+function AdminUserManagement() {
+
+  const [users, setUsers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [roleFilter, setRoleFilter] = useState("all");
+
+
+  // ==========================================
+  // LOAD USERS
+  // ==========================================
+
+  const loadUsers = async () => {
+
+    try {
+
+      setLoading(true);
+
+      const response = await api.get(
+        "/user/admin/all"
+      );
+
+      console.log(
+        "Admin Users Response:",
+        response.data
+      );
+
+      if (!response.data?.success) {
+
+        throw new Error(
+          response.data?.message ||
+          "Failed to load users"
+        );
+
+      }
+
+      setUsers(
+        response.data.users || []
+      );
+
+    } catch (error: any) {
+
+      console.error(
+        "Failed to load users:",
+        error?.response?.data || error
+      );
+
+      alert(
+        error?.response?.data?.message ||
+        error?.message ||
+        "Failed to load users"
+      );
+
+    } finally {
+
+      setLoading(false);
+
+    }
+
+  };
+
+
+  // ==========================================
+  // LOAD WHEN PAGE OPENS
+  // ==========================================
+
+  useEffect(() => {
+
+    loadUsers();
+
+  }, []);
+
+
+  // ==========================================
+  // FILTER USERS
+  // ==========================================
+
+  const filteredUsers =
+    users.filter((user) => {
+
+      const searchText =
+        search.toLowerCase();
+
+      const matchesSearch =
+        String(user.full_name || "")
+          .toLowerCase()
+          .includes(searchText) ||
+
+        String(user.email || "")
+          .toLowerCase()
+          .includes(searchText) ||
+
+        String(user.phone || "")
+          .toLowerCase()
+          .includes(searchText);
+
+
+      const matchesRole =
+        roleFilter === "all" ||
+        String(user.role || "").toLowerCase() ===
+        roleFilter.toLowerCase();
+
+
+      return (
+        matchesSearch &&
+        matchesRole
+      );
+
+    });
+
+
+  // ==========================================
+  // ROLE BADGE
+  // ==========================================
+
+  const getRoleStyle = (role: string) => {
+
+    switch (
+      String(role).toLowerCase()
+    ) {
+
+      case "admin":
+        return "bg-purple-50 text-purple-700";
+
+      case "pharmacy":
+        return "bg-green-50 text-green-700";
+
+      case "customer":
+        return "bg-blue-50 text-blue-700";
+
+      default:
+        return "bg-slate-50 text-slate-600";
+
+    }
+
+  };
+
+
+  // ==========================================
+  // LOADING
+  // ==========================================
+
+  if (loading) {
+
+    return (
+      <div className="p-6">
+
+        <div className="bg-white rounded-2xl p-10 text-center shadow-sm border border-black/5">
+
+          <div className="inline-block w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-3" />
+
+          <p className="text-sm text-slate-500">
+            Loading users...
+          </p>
+
+        </div>
+
+      </div>
+    );
+
+  }
+
+
+  // ==========================================
+  // PAGE
+  // ==========================================
+
+  return (
+
+    <div className="p-6 space-y-5">
+
+      {/* HEADER */}
+
+      <div className="flex items-center justify-between">
+
+        <div>
+
+          <h1 className="text-2xl font-bold text-slate-800">
+            User Management
+          </h1>
+
+          <p className="text-slate-500 text-sm mt-1">
+            Manage registered MediFind BD users
+          </p>
+
+        </div>
+
+
+        <button
+          onClick={loadUsers}
+          className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-50"
+        >
+          Refresh
+        </button>
+
+      </div>
+
+
+      {/* STAT CARDS */}
+
+      <div className="grid grid-cols-4 gap-5">
+
+        <StatCard
+          icon={Users}
+          label="Total Users"
+          value={String(users.length)}
+          sub="registered users"
+          color="bg-blue-500"
+        />
+
+        <StatCard
+          icon={User}
+          label="Customers"
+          value={String(
+            users.filter(
+              u => u.role === "customer"
+            ).length
+          )}
+          sub="customer accounts"
+          color="bg-green-500"
+        />
+
+        <StatCard
+          icon={Building2}
+          label="Pharmacy Users"
+          value={String(
+            users.filter(
+              u => u.role === "pharmacy"
+            ).length
+          )}
+          sub="pharmacy accounts"
+          color="bg-amber-500"
+        />
+
+        <StatCard
+          icon={Shield}
+          label="Admins"
+          value={String(
+            users.filter(
+              u => u.role === "admin"
+            ).length
+          )}
+          sub="admin accounts"
+          color="bg-purple-500"
+        />
+
+      </div>
+
+
+      {/* SEARCH + FILTER */}
+
+      <div className="bg-white rounded-2xl p-5 shadow-sm border border-black/5">
+
+        <div className="flex gap-3">
+
+          {/* SEARCH */}
+
+          <div className="flex-1 flex items-center gap-3 px-4 py-3 rounded-xl border border-slate-200 focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100">
+
+            <Search
+              size={18}
+              className="text-slate-400"
+            />
+
+            <input
+              value={search}
+              onChange={(e) =>
+                setSearch(e.target.value)
+              }
+              className="flex-1 outline-none text-sm text-slate-700"
+              placeholder="Search by name, email or phone..."
+            />
+
+          </div>
+
+
+          {/* ROLE FILTER */}
+
+          <select
+            value={roleFilter}
+            onChange={(e) =>
+              setRoleFilter(e.target.value)
+            }
+            className="px-4 py-3 rounded-xl border border-slate-200 text-sm text-slate-600 outline-none"
+          >
+
+            <option value="all">
+              All Roles
+            </option>
+
+            <option value="customer">
+              Customers
+            </option>
+
+            <option value="pharmacy">
+              Pharmacy
+            </option>
+
+            <option value="admin">
+              Admin
+            </option>
+
+          </select>
+
+        </div>
+
+      </div>
+
+
+      {/* USER TABLE */}
+
+      <div className="bg-white rounded-2xl shadow-sm border border-black/5 overflow-hidden">
+
+        <div className="px-6 py-4 border-b border-slate-100">
+
+          <h3 className="font-bold text-slate-800">
+            Registered Users
+          </h3>
+
+          <p className="text-xs text-slate-400 mt-1">
+            {filteredUsers.length} users found
+          </p>
+
+        </div>
+
+
+        {filteredUsers.length === 0 ? (
+
+          <div className="p-10 text-center">
+
+            <Users
+              size={40}
+              className="mx-auto text-slate-300 mb-3"
+            />
+
+            <p className="text-sm text-slate-500">
+              No users found
+            </p>
+
+          </div>
+
+        ) : (
+
+          <table className="w-full">
+
+            <thead className="bg-slate-50 border-b border-slate-100">
+
+              <tr>
+
+                {[
+                  "ID",
+                  "User",
+                  "Email",
+                  "Phone",
+                  "Role"
+                ].map((heading) => (
+
+                  <th
+                    key={heading}
+                    className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide"
+                  >
+                    {heading}
+                  </th>
+
+                ))}
+
+              </tr>
+
+            </thead>
+
+
+            <tbody className="divide-y divide-slate-50">
+
+              {filteredUsers.map(
+                (user) => (
+
+                  <tr
+                    key={user.id}
+                    className="hover:bg-slate-50/50"
+                  >
+
+                    <td className="px-6 py-4 text-xs font-mono text-slate-400">
+                      #{user.id}
+                    </td>
+
+
+                    <td className="px-6 py-4">
+
+                      <div className="flex items-center gap-3">
+
+                        <div className="w-9 h-9 rounded-full bg-blue-50 flex items-center justify-center">
+
+                          <User
+                            size={16}
+                            className="text-blue-500"
+                          />
+
+                        </div>
+
+                        <div>
+
+                          <p className="text-sm font-semibold text-slate-800">
+                            {user.full_name || "—"}
+                          </p>
+
+                        </div>
+
+                      </div>
+
+                    </td>
+
+
+                    <td className="px-6 py-4 text-sm text-slate-500">
+                      {user.email || "—"}
+                    </td>
+
+
+                    <td className="px-6 py-4 text-sm text-slate-500">
+                      {user.phone || "—"}
+                    </td>
+
+
+                    <td className="px-6 py-4">
+
+                      <span
+                        className={`px-3 py-1 rounded-full text-xs font-semibold ${getRoleStyle(
+                          user.role
+                        )}`}
+                      >
+                        {String(
+                          user.role || "unknown"
+                        )
+                          .charAt(0)
+                          .toUpperCase() +
+                          String(
+                            user.role || "unknown"
+                          ).slice(1)}
+
+                      </span>
+
+                    </td>
+
+                  </tr>
+
+                )
+              )}
+
+            </tbody>
+
+          </table>
+
+        )}
+
+      </div>
+
+    </div>
+
+  );
+}
+
 function AdminPharmacyApproval() {
   const [pharmacies, setPharmacies] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -8856,6 +9317,7 @@ export default function App() {
       case "register": return <RegisterPage setPage={setPage} />;
       case "forgot-password": return <ForgotPasswordPage setPage={setPage} />;
       case "user-dashboard": return <UserDashboard setPage={setPage} />;
+      case "admin-user-management": return <AdminUserManagement />;
       case "medicine-search":
         return (
           <MedicineSearchPage
