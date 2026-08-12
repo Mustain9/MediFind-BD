@@ -9,8 +9,16 @@ const {
     createPharmacy,
     updatePharmacy,
     approvePharmacy,
-    rejectPharmacy
+    rejectPharmacy,
+    getMyPharmacy
 } = require("../controllers/pharmacyController");
+
+const verifyToken = require("../middleware/authMiddleware");
+
+router.get("/my-pharmacy", verifyToken, getMyPharmacy);
+
+// Get single pharmacy
+router.get("/:id", getPharmacyById);
 
 
 // Get approved pharmacies
@@ -19,8 +27,7 @@ router.get("/", getPharmacies);
 // Get all pharmacies - admin
 router.get("/all", getAllPharmacies);
 
-// Get single pharmacy
-router.get("/:id", getPharmacyById);
+
 
 // Create pharmacy
 router.post("/", createPharmacy);

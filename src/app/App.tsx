@@ -481,134 +481,323 @@ function HomePage({
     </div>
   );
 }
+function LoginPage({
+  setPage,
+  setPanel
+}: {
+  setPage: (p: Page) => void;
+  setPanel: (p: Panel) => void;
+}) {
 
-function LoginPage({ setPage, setPanel }: { setPage: (p: Page) => void; setPanel: (p: Panel) => void }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+
   const handleLogin = async () => {
 
-    try{
+    // ==============================
+    // VALIDATION
+    // ==============================
 
-        const response = await fetch("http://localhost:5000/api/auth/login",{
+    if (!email.trim()) {
+      alert("Please enter your email.");
+      return;
+    }
 
-            method:"POST",
+    if (!password.trim()) {
+      alert("Please enter your password.");
+      return;
+    }
 
-            headers:{
-                "Content-Type":"application/json"
-            },
+    try {
 
-            body:JSON.stringify({
+      setLoading(true);
 
-                email,
-                password
+      // ==============================
+      // LOGIN API
+      // ==============================
 
-            })
+      const response = await fetch(
+        "http://localhost:5000/api/auth/login",
+        {
+          method: "POST",
 
-        });
+          headers: {
+            "Content-Type": "application/json"
+          },
 
-        const data = await response.json();
+          body: JSON.stringify({
+            email: email.trim(),
+            password
+          })
+        }
+      );
 
-        if(data.success){
+      const data = await response.json();
 
-            localStorage.setItem("token",data.token);
+      // ==============================
+      // LOGIN SUCCESS
+      // ==============================
 
-            localStorage.setItem("user",JSON.stringify(data.user));
+      if (data.success) {
 
-            localStorage.setItem("role", data.user.role);
+        console.log("Login successful:", data.user);
 
-            if(data.user.role==="customer"){
+        // Save JWT
+        localStorage.setItem(
+          "token",
+          data.token
+        );
 
-                setPanel("user");
-                setPage("user-dashboard");
-            }
+        // Save complete user
+        localStorage.setItem(
+          "user",
+          JSON.stringify(data.user)
+        );
 
-            else if(data.user.role==="pharmacy"){
+        // Save role
+        localStorage.setItem(
+          "role",
+          data.user.role
+        );
 
-                setPanel("pharmacy");
-                setPage("pharmacy-dashboard");
+        // ==============================
+        // ROLE BASED REDIRECT
+        // ==============================
 
-            }
+        if (data.user.role === "customer") {
 
-            else if(data.user.role==="admin"){
-
-                setPanel("admin");
-                setPage("admin-dashboard");
-
-            }
+          setPanel("user");
+          setPage("user-dashboard");
 
         }
 
-        else{
+        else if (data.user.role === "pharmacy") {
 
-            alert(data.message);
+          setPanel("pharmacy");
+          setPage("pharmacy-dashboard");
 
         }
 
+        else if (data.user.role === "admin") {
+
+          setPanel("admin");
+          setPage("admin-dashboard");
+
+        }
+
+        else {
+
+          alert("Unknown user role.");
+
+        }
+
+      }
+
+      // ==============================
+      // LOGIN FAILED
+      // ==============================
+
+      else {
+
+        alert(
+          data.message || "Login failed."
+        );
+
+      }
+
     }
 
-    catch(err){
+    catch (error) {
 
-        alert("Server Error");
+      console.error(
+        "Login error:",
+        error
+      );
+
+      alert(
+        "Cannot connect to the server. Make sure the backend is running."
+      );
 
     }
 
-  }
+    finally {
+
+      setLoading(false);
+
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100 flex items-center justify-center p-6">
+
       <div className="w-full max-w-md">
+
+        {/* Logo / Header */}
+
         <div className="text-center mb-8">
+
           <div className="w-14 h-14 rounded-2xl bg-blue-600 flex items-center justify-center mx-auto mb-4">
-            <Stethoscope size={26} className="text-white" />
+
+            <Stethoscope
+              size={26}
+              className="text-white"
+            />
+
           </div>
-          <h1 className="text-2xl font-bold text-slate-800">Welcome Back</h1>
-          <p className="text-slate-500 text-sm mt-1">Sign in to your MediFind BD account</p>
+
+          <h1 className="text-2xl font-bold text-slate-800">
+            Welcome Back
+          </h1>
+
+          <p className="text-slate-500 text-sm mt-1">
+            Sign in to your MediFind BD account
+          </p>
+
         </div>
+
+
+        {/* Login Card */}
+
         <div className="bg-white rounded-2xl p-8 shadow-sm border border-black/5">
+
           <div className="space-y-4">
+
+            {/* Email */}
+
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1.5">Phone / Email</label>
-             <input
-                  value={email}
-                  onChange={(e)=>setEmail(e.target.value)}
-                  placeholder="01XXXXXXXXX or email@example.com"
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm"
-                  />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1.5">Password</label>
-                 <input
-                    type="password"
-                    value={password}
-                    onChange={(e)=>setPassword(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm"
-                    />
-            </div>
-            <div className="flex items-center justify-between text-sm">
-              <label className="flex items-center gap-2 text-slate-600">
-                <input type="checkbox" className="rounded" /> Remember me
+
+              <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                Email
               </label>
-              <button onClick={() => setPage("forgot-password")} className="text-blue-600 hover:underline">Forgot password?</button>
+
+              <input
+                type="email"
+                value={email}
+                onChange={(e) =>
+                  setEmail(e.target.value)
+                }
+                placeholder="email@example.com"
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              />
+
             </div>
+
+
+            {/* Password */}
+
+            <div>
+
+              <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                Password
+              </label>
+
+              <input
+                type="password"
+                value={password}
+                onChange={(e) =>
+                  setPassword(e.target.value)
+                }
+                placeholder="Enter your password"
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    handleLogin();
+                  }
+                }}
+              />
+
+            </div>
+
+
+            {/* Remember / Forgot */}
+
+            <div className="flex items-center justify-between text-sm">
+
+              <label className="flex items-center gap-2 text-slate-600">
+
+                <input
+                  type="checkbox"
+                  className="rounded"
+                />
+
+                Remember me
+
+              </label>
+
+              <button
+                onClick={() =>
+                  setPage("forgot-password")
+                }
+                className="text-blue-600 hover:underline"
+              >
+                Forgot password?
+              </button>
+
+            </div>
+
           </div>
+
+
+          {/* Sign In Button */}
+
           <button
             onClick={handleLogin}
-            className="w-full mt-6 py-3 bg-blue-600 text-white rounded-xl font-semibold text-sm hover:bg-blue-700 transition-colors shadow-sm"
+            disabled={loading}
+            className={`w-full mt-6 py-3 text-white rounded-xl font-semibold text-sm transition-colors shadow-sm ${
+              loading
+                ? "bg-blue-400 cursor-not-allowed"
+                : "bg-blue-600 hover:bg-blue-700"
+            }`}
           >
-            Sign In
+
+            {loading
+              ? "Signing In..."
+              : "Sign In"}
+
           </button>
+
+
+          {/* Register */}
+
           <div className="mt-4 text-center text-sm text-slate-500">
-            Don&apos;t have an account?{" "}
-            <button onClick={() => setPage("register")} className="text-blue-600 font-semibold hover:underline">Register now</button>
+
+            Don't have an account?{" "}
+
+            <button
+              onClick={() =>
+                setPage("register")
+              }
+              className="text-blue-600 font-semibold hover:underline"
+            >
+              Register now
+            </button>
+
           </div>
+
         </div>
+
+
+        {/* Back Home */}
+
         <p className="text-center text-xs text-slate-400 mt-6">
-          <button onClick={() => setPage("home")} className="hover:text-blue-600">← Back to Home</button>
+
+          <button
+            onClick={() =>
+              setPage("home")
+            }
+            className="hover:text-blue-600"
+          >
+            ← Back to Home
+          </button>
+
         </p>
+
       </div>
+
     </div>
   );
 }
-
 function RegisterPage({ setPage }: { setPage: (p: Page) => void }) {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -2672,7 +2861,6 @@ function PharmacyDashboard({ setPage }: { setPage: (p: Page) => void }) {
     </div>
   );
 }
-
 function PharmacyInventory() {
     const [search, setSearch] = useState("");
     const [statusFilter, setStatusFilter] = useState("All Status");
@@ -2689,47 +2877,32 @@ function PharmacyInventory() {
         price: ""
     });
 
-    // TEMPORARY pharmacy ID
-    // Later this will come from the logged-in pharmacy account.
-    const PHARMACY_ID = 1;
-
-
     // ==========================================
-    // LOAD PHARMACY INVENTORY
+    // LOAD LOGGED-IN PHARMACY INVENTORY
     // ==========================================
 
-const loadInventory = async () => {
+    const loadInventory = async () => {
+        try {
+            const response = await api.get("/inventory/my-inventory");
 
-    try {
+            console.log("Inventory response:", response.data);
 
-        console.log("Loading inventory...");
+            if (response.data.success) {
+                setInventory(response.data.inventory || []);
+            } else {
+                setInventory([]);
+            }
 
-        const response = await api.get(
-            `/inventory/pharmacy/${PHARMACY_ID}`
-        );
+        } catch (error: any) {
 
-        console.log("Inventory response:", response.data);
+            console.error(
+                "Failed to load inventory:",
+                error.response?.data || error
+            );
 
-        setInventory(
-            response.data.inventory || []
-        );
-
-    } catch (error) {
-
-        console.error(
-            "Inventory loading error:",
-            error
-        );
-
-    }
-
-};
-useEffect(() => {
-
-    loadInventory();
-    loadMedicines();
-
-}, []);
+            setInventory([]);
+        }
+    };
 
 
     // ==========================================
@@ -2737,26 +2910,34 @@ useEffect(() => {
     // ==========================================
 
     const loadMedicines = async () => {
-
         try {
 
             const response = await api.get("/medicines");
 
-            setMedicines(
-                Array.isArray(response.data)
-                    ? response.data
-                    : []
-            );
+            console.log("Medicines response:", response.data);
 
-        } catch (error) {
+            if (Array.isArray(response.data)) {
+
+                setMedicines(response.data);
+
+            } else if (Array.isArray(response.data.medicines)) {
+
+                setMedicines(response.data.medicines);
+
+            } else {
+
+                setMedicines([]);
+            }
+
+        } catch (error: any) {
 
             console.error(
-                "Failed to load medicines",
-                error
+                "Failed to load medicines:",
+                error.response?.data || error
             );
 
+            setMedicines([]);
         }
-
     };
 
 
@@ -2776,7 +2957,7 @@ useEffect(() => {
     // FILTER INVENTORY
     // ==========================================
 
-    const filtered = inventory.filter(item => {
+    const filtered = inventory.filter((item) => {
 
         const searchText = search.toLowerCase();
 
@@ -2790,28 +2971,29 @@ useEffect(() => {
                 .includes(searchText);
 
 
+        const stock = Number(item.stock || 0);
+
         const matchesStatus =
             statusFilter === "All Status" ||
 
             (
                 statusFilter === "Available" &&
-                item.stock >= 15
+                stock >= 15
             ) ||
 
             (
                 statusFilter === "Low Stock" &&
-                item.stock > 0 &&
-                item.stock < 15
+                stock > 0 &&
+                stock < 15
             ) ||
 
             (
                 statusFilter === "Out of Stock" &&
-                item.stock === 0
+                stock === 0
             );
 
 
         return matchesSearch && matchesStatus;
-
     });
 
 
@@ -2830,7 +3012,6 @@ useEffect(() => {
         });
 
         setShowModal(true);
-
     };
 
 
@@ -2849,7 +3030,6 @@ useEffect(() => {
         });
 
         setShowModal(true);
-
     };
 
 
@@ -2864,7 +3044,6 @@ useEffect(() => {
             alert("Please select a medicine.");
 
             return;
-
         }
 
 
@@ -2876,7 +3055,26 @@ useEffect(() => {
             alert("Please enter stock and price.");
 
             return;
+        }
 
+
+        const stock = Number(form.stock);
+        const price = Number(form.price);
+
+
+        if (stock < 0) {
+
+            alert("Stock cannot be negative.");
+
+            return;
+        }
+
+
+        if (price < 0) {
+
+            alert("Price cannot be negative.");
+
+            return;
         }
 
 
@@ -2884,13 +3082,15 @@ useEffect(() => {
 
             if (editingItem) {
 
+                // ==========================================
                 // UPDATE EXISTING INVENTORY
+                // ==========================================
 
                 await api.put(
                     `/inventory/${editingItem.id}`,
                     {
-                        stock: Number(form.stock),
-                        price: Number(form.price)
+                        stock,
+                        price
                     }
                 );
 
@@ -2898,23 +3098,24 @@ useEffect(() => {
 
             } else {
 
+                // ==========================================
                 // ADD NEW INVENTORY
+                // ==========================================
 
                 await api.post(
                     "/inventory",
                     {
-                        pharmacy_id: PHARMACY_ID,
                         medicine_id: Number(form.medicine_id),
-                        stock: Number(form.stock),
-                        price: Number(form.price)
+                        stock,
+                        price
                     }
                 );
 
                 alert("Medicine added to inventory.");
-
             }
 
 
+            // Close modal
             setShowModal(false);
 
             setEditingItem(null);
@@ -2925,37 +3126,25 @@ useEffect(() => {
                 price: ""
             });
 
-            await loadInventory();
 
+            // Reload inventory from database
+            await loadInventory();
 
         } catch (error: any) {
 
             console.error(
                 "Inventory save error:",
-                error
+                error.response?.data || error
             );
 
 
-            if (
-                error.response &&
-                error.response.status === 409
-            ) {
+            const message =
+                error.response?.data?.message ||
+                "Failed to save inventory.";
 
-                alert(
-                    "This medicine already exists in this pharmacy inventory."
-                );
 
-            } else {
-
-                alert(
-                    error.response?.data?.message ||
-                    "Failed to save inventory."
-                );
-
-            }
-
+            alert(message);
         }
-
     };
 
 
@@ -2989,16 +3178,14 @@ useEffect(() => {
 
             console.error(
                 "Delete inventory error:",
-                error
+                error.response?.data || error
             );
 
             alert(
                 error.response?.data?.message ||
                 "Failed to delete inventory."
             );
-
         }
-
     };
 
 
@@ -3064,7 +3251,7 @@ useEffect(() => {
 
                         <input
                             value={search}
-                            onChange={e =>
+                            onChange={(e) =>
                                 setSearch(e.target.value)
                             }
                             className="flex-1 outline-none text-sm text-slate-700"
@@ -3076,7 +3263,7 @@ useEffect(() => {
 
                     <select
                         value={statusFilter}
-                        onChange={e =>
+                        onChange={(e) =>
                             setStatusFilter(e.target.value)
                         }
                         className="px-4 py-2.5 rounded-xl border border-slate-200 text-sm bg-white"
@@ -3109,7 +3296,7 @@ useEffect(() => {
                                 "Selling Price",
                                 "Status",
                                 "Actions"
-                            ].map(h => (
+                            ].map((h) => (
 
                                 <th
                                     key={h}
@@ -3135,148 +3322,157 @@ useEffect(() => {
                                     colSpan={6}
                                     className="px-6 py-12 text-center text-sm text-slate-400"
                                 >
-                                    No inventory items found.
+                                    {inventory.length === 0
+                                        ? "No inventory items found."
+                                        : "No medicines match your search or filter."
+                                    }
                                 </td>
 
                             </tr>
 
                         ) : (
 
-                            filtered.map(item => (
+                            filtered.map((item) => {
 
-                                <tr
-                                    key={item.id}
-                                    className="hover:bg-slate-50/50 transition-colors"
-                                >
+                                const stock = Number(item.stock || 0);
 
-                                    {/* Medicine */}
+                                return (
 
-                                    <td className="px-6 py-4">
+                                    <tr
+                                        key={item.id}
+                                        className="hover:bg-slate-50/50 transition-colors"
+                                    >
 
-                                        <div className="flex items-center gap-3">
+                                        {/* Medicine */}
 
-                                            <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
+                                        <td className="px-6 py-4">
 
-                                                <Pill
-                                                    size={14}
-                                                    className="text-blue-400"
-                                                />
+                                            <div className="flex items-center gap-3">
+
+                                                <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
+
+                                                    <Pill
+                                                        size={14}
+                                                        className="text-blue-400"
+                                                    />
+
+                                                </div>
+
+                                                <p className="text-sm font-semibold text-slate-800">
+                                                    {item.brand_name || "Unknown Medicine"}
+                                                </p>
 
                                             </div>
 
-                                            <p className="text-sm font-semibold text-slate-800">
-                                                {item.brand_name}
-                                            </p>
-
-                                        </div>
-
-                                    </td>
+                                        </td>
 
 
-                                    {/* Generic */}
+                                        {/* Generic */}
 
-                                    <td className="px-6 py-4 text-sm text-slate-500">
+                                        <td className="px-6 py-4 text-sm text-slate-500">
 
-                                        {item.generic_name || "—"}
+                                            {item.generic_name || "—"}
 
-                                    </td>
-
-
-                                    {/* Stock */}
-
-                                    <td className="px-6 py-4">
-
-                                        <span
-                                            className={`text-sm font-bold ${
-                                                item.stock === 0
-                                                    ? "text-red-500"
-                                                    : item.stock < 15
-                                                    ? "text-amber-500"
-                                                    : "text-slate-800"
-                                            }`}
-                                        >
-                                            {item.stock}
-                                        </span>
-
-                                    </td>
+                                        </td>
 
 
-                                    {/* Price */}
+                                        {/* Stock */}
 
-                                    <td className="px-6 py-4 text-sm font-semibold text-blue-600">
+                                        <td className="px-6 py-4">
 
-                                        ৳{Number(item.price).toFixed(2)}
-
-                                    </td>
-
-
-                                    {/* Status */}
-
-                                    <td className="px-6 py-4">
-
-                                        <Badge
-                                            label={
-                                                item.stock === 0
-                                                    ? "Out of Stock"
-                                                    : item.stock < 15
-                                                    ? "Low Stock"
-                                                    : "Available"
-                                            }
-                                            variant={
-                                                item.stock === 0
-                                                    ? "red"
-                                                    : item.stock < 15
-                                                    ? "yellow"
-                                                    : "green"
-                                            }
-                                        />
-
-                                    </td>
-
-
-                                    {/* Actions */}
-
-                                    <td className="px-6 py-4">
-
-                                        <div className="flex gap-2">
-
-                                            <button
-                                                onClick={() =>
-                                                    openEditModal(item)
-                                                }
-                                                className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600 transition-colors"
-                                                title="Edit"
+                                            <span
+                                                className={`text-sm font-bold ${
+                                                    stock === 0
+                                                        ? "text-red-500"
+                                                        : stock < 15
+                                                        ? "text-amber-500"
+                                                        : "text-slate-800"
+                                                }`}
                                             >
-                                                <Edit2 size={14} />
-                                            </button>
+                                                {stock}
+                                            </span>
+
+                                        </td>
 
 
-                                            <button
-                                                onClick={() =>
-                                                    openEditModal(item)
+                                        {/* Price */}
+
+                                        <td className="px-6 py-4 text-sm font-semibold text-blue-600">
+
+                                            ৳{Number(item.price || 0).toFixed(2)}
+
+                                        </td>
+
+
+                                        {/* Status */}
+
+                                        <td className="px-6 py-4">
+
+                                            <Badge
+                                                label={
+                                                    stock === 0
+                                                        ? "Out of Stock"
+                                                        : stock < 15
+                                                        ? "Low Stock"
+                                                        : "Available"
                                                 }
-                                                className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
-                                            >
-                                                Update Stock
-                                            </button>
-
-
-                                            <button
-                                                onClick={() =>
-                                                    deleteInventory(item.id)
+                                                variant={
+                                                    stock === 0
+                                                        ? "red"
+                                                        : stock < 15
+                                                        ? "yellow"
+                                                        : "green"
                                                 }
-                                                className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
-                                            >
-                                                Delete
-                                            </button>
+                                            />
 
-                                        </div>
+                                        </td>
 
-                                    </td>
 
-                                </tr>
+                                        {/* Actions */}
 
-                            ))
+                                        <td className="px-6 py-4">
+
+                                            <div className="flex gap-2">
+
+                                                <button
+                                                    onClick={() =>
+                                                        openEditModal(item)
+                                                    }
+                                                    className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600 transition-colors"
+                                                    title="Edit"
+                                                >
+                                                    <Edit2 size={14} />
+                                                </button>
+
+
+                                                <button
+                                                    onClick={() =>
+                                                        openEditModal(item)
+                                                    }
+                                                    className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
+                                                >
+                                                    Update Stock
+                                                </button>
+
+
+                                                <button
+                                                    onClick={() =>
+                                                        deleteInventory(item.id)
+                                                    }
+                                                    className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
+                                                >
+                                                    Delete
+                                                </button>
+
+                                            </div>
+
+                                        </td>
+
+                                    </tr>
+
+                                );
+
+                            })
 
                         )}
 
@@ -3305,7 +3501,8 @@ useEffect(() => {
 
                                     {editingItem
                                         ? "Edit Inventory"
-                                        : "Add Medicine to Inventory"}
+                                        : "Add Medicine to Inventory"
+                                    }
 
                                 </h2>
 
@@ -3313,7 +3510,8 @@ useEffect(() => {
 
                                     {editingItem
                                         ? "Update stock and selling price"
-                                        : "Add a medicine to your pharmacy"}
+                                        : "Add a medicine to your pharmacy"
+                                    }
 
                                 </p>
 
@@ -3343,7 +3541,7 @@ useEffect(() => {
                             <select
                                 value={form.medicine_id}
                                 disabled={!!editingItem}
-                                onChange={e =>
+                                onChange={(e) =>
                                     setForm({
                                         ...form,
                                         medicine_id: e.target.value
@@ -3356,7 +3554,7 @@ useEffect(() => {
                                     Select Medicine
                                 </option>
 
-                                {medicines.map(medicine => (
+                                {medicines.map((medicine) => (
 
                                     <option
                                         key={medicine.id}
@@ -3365,7 +3563,8 @@ useEffect(() => {
                                         {medicine.brand_name}
                                         {medicine.generic_name
                                             ? ` - ${medicine.generic_name}`
-                                            : ""}
+                                            : ""
+                                        }
                                     </option>
 
                                 ))}
@@ -3387,7 +3586,7 @@ useEffect(() => {
                                 type="number"
                                 min="0"
                                 value={form.stock}
-                                onChange={e =>
+                                onChange={(e) =>
                                     setForm({
                                         ...form,
                                         stock: e.target.value
@@ -3413,7 +3612,7 @@ useEffect(() => {
                                 min="0"
                                 step="0.01"
                                 value={form.price}
-                                onChange={e =>
+                                onChange={(e) =>
                                     setForm({
                                         ...form,
                                         price: e.target.value
@@ -3446,7 +3645,8 @@ useEffect(() => {
                             >
                                 {editingItem
                                     ? "Save Changes"
-                                    : "Add Medicine"}
+                                    : "Add Medicine"
+                                }
                             </button>
 
                         </div>
@@ -3916,43 +4116,485 @@ function PharmacyReservations() {
   );
 }
 
-
 function PharmacyProfile() {
-  return (
-    <div className="p-6 space-y-5 max-w-2xl">
-      <h1 className="text-2xl font-bold text-slate-800">Pharmacy Profile</h1>
-      <div className="bg-white rounded-2xl p-6 shadow-sm border border-black/5">
-        <div className="flex items-center gap-5 mb-6 pb-6 border-b border-slate-100">
-          <div className="w-16 h-16 rounded-2xl bg-green-100 flex items-center justify-center">
-            <Building2 size={28} className="text-green-600" />
-          </div>
-          <div>
-            <h2 className="text-xl font-bold text-slate-800">Dhaka Medical Pharmacy</h2>
-            <p className="text-slate-500 text-sm">License: DDA-2019-0042 · Verified</p>
-            <Badge label="Active" variant="green" />
-          </div>
-        </div>
-        <div className="grid grid-cols-2 gap-5">
-          {[
-            { label: "Owner Name", value: "Md. Zahirul Islam" },
-            { label: "Phone Number", value: "01711-234567" },
-            { label: "Email", value: "dhaka.medical@pharmacy.bd" },
-            { label: "Area / Thana", value: "Shahbag, Dhaka" },
-            { label: "Full Address", value: "123 Shahbag Avenue, Dhaka-1000" },
-            { label: "Opening Hours", value: "Open 24 Hours" },
-          ].map(f => (
-            <div key={f.label}>
-              <label className="text-xs font-semibold text-slate-400 uppercase tracking-wide">{f.label}</label>
-              <input defaultValue={f.value} className="mt-1 w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100" />
+    const [pharmacy, setPharmacy] = useState<any>(null);
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
+
+    const [form, setForm] = useState({
+        pharmacy_name: "",
+        owner_name: "",
+        phone: "",
+        email: "",
+        address: "",
+        opening_time: "",
+        closing_time: ""
+    });
+
+
+    // ==========================================
+    // LOAD MY PHARMACY
+    // ==========================================
+
+    const loadPharmacy = async () => {
+        try {
+
+            setLoading(true);
+
+            const response = await api.get(
+                "/pharmacies/my-pharmacy"
+            );
+
+            console.log(
+                "My pharmacy:",
+                response.data
+            );
+
+            if (response.data.success) {
+
+                const data = response.data.pharmacy;
+
+                setPharmacy(data);
+
+                setForm({
+                    pharmacy_name: data.pharmacy_name || "",
+                    owner_name: data.owner_name || "",
+                    phone: data.phone || "",
+                    email: data.email || "",
+                    address: data.address || "",
+                    opening_time: data.opening_time || "",
+                    closing_time: data.closing_time || ""
+                });
+            }
+
+        } catch (error: any) {
+
+            console.error(
+                "Failed to load pharmacy:",
+                error.response?.data || error
+            );
+
+            alert(
+                error.response?.data?.message ||
+                "Failed to load pharmacy profile."
+            );
+
+        } finally {
+
+            setLoading(false);
+
+        }
+    };
+
+
+    // ==========================================
+    // LOAD PROFILE
+    // ==========================================
+
+    useEffect(() => {
+
+        loadPharmacy();
+
+    }, []);
+
+
+    // ==========================================
+    // HANDLE INPUT
+    // ==========================================
+
+    const handleChange = (
+        e: React.ChangeEvent<HTMLInputElement>
+    ) => {
+
+        const { name, value } = e.target;
+
+        setForm((prev) => ({
+            ...prev,
+            [name]: value
+        }));
+    };
+
+
+    // ==========================================
+    // SAVE PROFILE
+    // ==========================================
+
+    const handleSave = async () => {
+
+        if (!pharmacy?.id) {
+
+            alert("Pharmacy information not found.");
+
+            return;
+        }
+
+
+        if (!form.pharmacy_name.trim()) {
+
+            alert("Pharmacy name is required.");
+
+            return;
+        }
+
+
+        if (!form.address.trim()) {
+
+            alert("Address is required.");
+
+            return;
+        }
+
+
+        try {
+
+            setSaving(true);
+
+            const response = await api.put(
+                `/pharmacies/${pharmacy.id}`,
+                {
+                    pharmacy_name: form.pharmacy_name,
+                    owner_name: form.owner_name,
+                    phone: form.phone,
+                    email: form.email,
+                    address: form.address,
+                    opening_time: form.opening_time || null,
+                    closing_time: form.closing_time || null
+                }
+            );
+
+
+            if (response.data.success) {
+
+                alert(
+                    "Pharmacy profile updated successfully."
+                );
+
+                await loadPharmacy();
+
+            } else {
+
+                alert(
+                    response.data.message ||
+                    "Failed to update profile."
+                );
+            }
+
+        } catch (error: any) {
+
+            console.error(
+                "Update pharmacy error:",
+                error.response?.data || error
+            );
+
+            alert(
+                error.response?.data?.message ||
+                "Failed to update pharmacy profile."
+            );
+
+        } finally {
+
+            setSaving(false);
+
+        }
+    };
+
+
+    // ==========================================
+    // LOADING
+    // ==========================================
+
+    if (loading) {
+
+        return (
+            <div className="p-6">
+
+                <div className="bg-white rounded-2xl p-10 shadow-sm border border-black/5 text-center">
+
+                    <p className="text-sm text-slate-500">
+                        Loading pharmacy profile...
+                    </p>
+
+                </div>
+
             </div>
-          ))}
+        );
+    }
+
+
+    // ==========================================
+    // NO PHARMACY
+    // ==========================================
+
+    if (!pharmacy) {
+
+        return (
+            <div className="p-6">
+
+                <div className="bg-white rounded-2xl p-10 shadow-sm border border-black/5 text-center">
+
+                    <Building2
+                        size={40}
+                        className="mx-auto text-slate-300 mb-3"
+                    />
+
+                    <h2 className="font-bold text-slate-700">
+                        Pharmacy Not Found
+                    </h2>
+
+                    <p className="text-sm text-slate-400 mt-1">
+                        No pharmacy profile is linked to this account.
+                    </p>
+
+                </div>
+
+            </div>
+        );
+    }
+
+
+    return (
+        <div className="p-6 space-y-5 max-w-3xl">
+
+            {/* ==========================================
+                HEADER
+            ========================================== */}
+
+            <div>
+
+                <h1 className="text-2xl font-bold text-slate-800">
+                    Pharmacy Profile
+                </h1>
+
+                <p className="text-slate-500 text-sm mt-1">
+                    Manage your pharmacy information
+                </p>
+
+            </div>
+
+
+            {/* ==========================================
+                PROFILE CARD
+            ========================================== */}
+
+            <div className="bg-white rounded-2xl p-6 shadow-sm border border-black/5">
+
+                {/* Pharmacy Header */}
+
+                <div className="flex items-center gap-5 mb-6 pb-6 border-b border-slate-100">
+
+                    <div className="w-16 h-16 rounded-2xl bg-green-100 flex items-center justify-center">
+
+                        <Building2
+                            size={28}
+                            className="text-green-600"
+                        />
+
+                    </div>
+
+
+                    <div className="flex-1">
+
+                        <h2 className="text-xl font-bold text-slate-800">
+                            {pharmacy.pharmacy_name}
+                        </h2>
+
+                        <p className="text-slate-500 text-sm mt-1">
+                            {pharmacy.email || "No email provided"}
+                        </p>
+
+
+                        <div className="mt-2">
+
+                            <Badge
+                                label={
+                                    pharmacy.status === "approved"
+                                        ? "Verified"
+                                        : pharmacy.status === "pending"
+                                        ? "Pending Approval"
+                                        : pharmacy.status === "rejected"
+                                        ? "Rejected"
+                                        : pharmacy.status
+                                }
+                                variant={
+                                    pharmacy.status === "approved"
+                                        ? "green"
+                                        : pharmacy.status === "pending"
+                                        ? "yellow"
+                                        : pharmacy.status === "rejected"
+                                        ? "red"
+                                        : "blue"
+                                }
+                            />
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                {/* ==========================================
+                    FORM
+                ========================================== */}
+
+                <div className="grid grid-cols-2 gap-5">
+
+                    {/* Pharmacy Name */}
+
+                    <div className="col-span-2">
+
+                        <label className="text-xs font-semibold text-slate-400 uppercase tracking-wide">
+                            Pharmacy Name
+                        </label>
+
+                        <input
+                            name="pharmacy_name"
+                            value={form.pharmacy_name}
+                            onChange={handleChange}
+                            className="mt-1 w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                        />
+
+                    </div>
+
+
+                    {/* Owner */}
+
+                    <div>
+
+                        <label className="text-xs font-semibold text-slate-400 uppercase tracking-wide">
+                            Owner Name
+                        </label>
+
+                        <input
+                            name="owner_name"
+                            value={form.owner_name}
+                            onChange={handleChange}
+                            className="mt-1 w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                        />
+
+                    </div>
+
+
+                    {/* Phone */}
+
+                    <div>
+
+                        <label className="text-xs font-semibold text-slate-400 uppercase tracking-wide">
+                            Phone Number
+                        </label>
+
+                        <input
+                            name="phone"
+                            value={form.phone}
+                            onChange={handleChange}
+                            className="mt-1 w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                        />
+
+                    </div>
+
+
+                    {/* Email */}
+
+                    <div className="col-span-2">
+
+                        <label className="text-xs font-semibold text-slate-400 uppercase tracking-wide">
+                            Email
+                        </label>
+
+                        <input
+                            type="email"
+                            name="email"
+                            value={form.email}
+                            onChange={handleChange}
+                            className="mt-1 w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                        />
+
+                    </div>
+
+
+                    {/* Address */}
+
+                    <div className="col-span-2">
+
+                        <label className="text-xs font-semibold text-slate-400 uppercase tracking-wide">
+                            Full Address
+                        </label>
+
+                        <input
+                            name="address"
+                            value={form.address}
+                            onChange={handleChange}
+                            className="mt-1 w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                        />
+
+                    </div>
+
+
+                    {/* Opening Time */}
+
+                    <div>
+
+                        <label className="text-xs font-semibold text-slate-400 uppercase tracking-wide">
+                            Opening Time
+                        </label>
+
+                        <input
+                            type="time"
+                            name="opening_time"
+                            value={form.opening_time}
+                            onChange={handleChange}
+                            className="mt-1 w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                        />
+
+                    </div>
+
+
+                    {/* Closing Time */}
+
+                    <div>
+
+                        <label className="text-xs font-semibold text-slate-400 uppercase tracking-wide">
+                            Closing Time
+                        </label>
+
+                        <input
+                            type="time"
+                            name="closing_time"
+                            value={form.closing_time}
+                            onChange={handleChange}
+                            className="mt-1 w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                        />
+
+                    </div>
+
+                </div>
+
+
+                {/* ==========================================
+                    SAVE BUTTON
+                ========================================== */}
+
+                <div className="mt-6 flex justify-end">
+
+                    <button
+                        onClick={handleSave}
+                        disabled={saving}
+                        className="px-6 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+
+                        {saving
+                            ? "Saving..."
+                            : "Save Changes"
+                        }
+
+                    </button>
+
+                </div>
+
+            </div>
+
         </div>
-        <button className="mt-6 px-6 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition-colors">
-          Save Changes
-        </button>
-      </div>
-    </div>
-  );
+    );
 }
 
 function AdminDashboard({ setPage }: { setPage: (p: Page) => void }) {

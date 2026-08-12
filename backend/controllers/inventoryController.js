@@ -111,108 +111,117 @@ exports.getPharmacyInventory = (req, res) => {
 // ADD INVENTORY
 // ==========================================
 exports.addInventory = (req, res) => {
+    const { medicine_id, stock, price } = req.body;
 
-    const {
-        pharmacy_id,
-        medicine_id,
-        stock,
-        price
-    } = req.body;
+    const userId = req.user.id;
 
-
-    if (!pharmacy_id || !medicine_id) {
-
+    if (!medicine_id || stock == null || price == null) {
         return res.status(400).json({
             success: false,
-            message: "Pharmacy and medicine are required"
+            message: "Medicine, stock and price are required"
         });
-
     }
 
-
-    // Check whether this medicine
-    // already exists for this pharmacy
-    const checkSql = `
+    // Find pharmacy belonging to logged-in user
+    const pharmacySql = `
         SELECT id
-        FROM inventory
-        WHERE pharmacy_id = ?
-        AND medicine_id = ?
+        FROM pharmacies
+        WHERE user_id = ?
+        LIMIT 1
     `;
 
-    db.query(
-        checkSql,
-        [pharmacy_id, medicine_id],
-        (err, existing) => {
+    db.query(pharmacySql, [userId], (err, pharmacyResult) => {
 
-            if (err) {
+        if (err) {
+            console.error("Pharmacy lookup error:", err);
 
-                console.error(err);
-
-                return res.status(500).json({
-                    success: false,
-                    message: "Database error"
-                });
-
-            }
-
-
-            if (existing.length > 0) {
-
-                return res.status(409).json({
-                    success: false,
-                    message: "This medicine already exists in the pharmacy inventory"
-                });
-
-            }
-
-
-            const insertSql = `
-                INSERT INTO inventory
-                (
-                    pharmacy_id,
-                    medicine_id,
-                    stock,
-                    price
-                )
-                VALUES (?, ?, ?, ?)
-            `;
-
-
-            db.query(
-                insertSql,
-                [
-                    pharmacy_id,
-                    medicine_id,
-                    stock || 0,
-                    price || 0
-                ],
-                (err, result) => {
-
-                    if (err) {
-
-                        console.error("Add Inventory Error:", err);
-
-                        return res.status(500).json({
-                            success: false,
-                            message: "Failed to add inventory",
-                            error: err.message
-                        });
-
-                    }
-
-
-                    res.status(201).json({
-                        success: true,
-                        message: "Medicine added to inventory",
-                        inventory_id: result.insertId
-                    });
-
-                }
-            );
-
+            return res.status(500).json({
+                success: false,
+                message: "Failed to find pharmacy"
+            });
         }
-    );
 
+        if (pharmacyResult.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: "No pharmacy found for this account"
+            });
+        }
+
+        // IMPORTANT:
+        // This is pharmacies.id, NOT users.id
+        const pharmacyId = pharmacyResult[0].id;
+
+        // Check duplicate medicine
+        const checkSql = `
+            SELECT id
+            FROM inventory
+            WHERE pharmacy_id = ?
+            AND medicine_id = ?
+        `;
+
+        db.query(
+            checkSql,
+            [pharmacyId, medicine_id],
+            (err, existing) => {
+
+                if (err) {
+                    console.error("Inventory check error:", err);
+
+                    return res.status(500).json({
+                        success: false,
+                        message: "Database error"
+                    });
+                }
+
+                if (existing.length > 0) {
+                    return res.status(400).json({
+                        success: false,
+                        message: "This medicine already exists in this pharmacy inventory."
+                    });
+                }
+
+                const insertSql = `
+                    INSERT INTO inventory
+                    (
+                        pharmacy_id,
+                        medicine_id,
+                        stock,
+                        price
+                    )
+                    VALUES (?, ?, ?, ?)
+                `;
+
+                db.query(
+                    insertSql,
+                    [
+                        pharmacyId,
+                        medicine_id,
+                        stock,
+                        price
+                    ],
+                    (err, result) => {
+
+                        if (err) {
+                            console.error("Add Inventory Error:", err);
+
+                            return res.status(500).json({
+                                success: false,
+                                message: "Failed to add inventory",
+                                error: err.message
+                            });
+                        }
+
+                        res.status(201).json({
+                            success: true,
+                            message: "Medicine added successfully",
+                            inventory_id: result.insertId
+                        });
+                    }
+                );
+            }
+        );
+    });
 };
 
 
@@ -331,4 +340,82 @@ exports.deleteInventory = (req, res) => {
         }
     );
 
+};
+
+
+// ==========================================
+// GET LOGGED-IN PHARMACY INVENTORY
+// ==========================================
+exports.getMyInventory = (req, res) => {
+
+    const userId = req.user.id;
+
+    const pharmacySql = `
+        SELECT id
+        FROM pharmacies
+        WHERE user_id = ?
+        LIMIT 1
+    `;
+
+    db.query(pharmacySql, [userId], (err, pharmacyResult) => {
+
+        if (err) {
+            console.error("Pharmacy lookup error:", err);
+
+            return res.status(500).json({
+                success: false,
+                message: "Failed to find pharmacy"
+            });
+        }
+
+        if (pharmacyResult.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: "No pharmacy found for this account"
+            });
+        }
+
+        const pharmacyId = pharmacyResult[0].id;
+
+        const sql = `
+            SELECT
+                inventory.id,
+                inventory.pharmacy_id,
+                inventory.medicine_id,
+                inventory.stock,
+                inventory.price,
+                inventory.updated_at,
+
+                medicines.brand_name,
+                medicines.generic_name,
+                medicines.strength,
+                medicines.dosage_form
+
+            FROM inventory
+
+            JOIN medicines
+                ON inventory.medicine_id = medicines.id
+
+            WHERE inventory.pharmacy_id = ?
+
+            ORDER BY inventory.id DESC
+        `;
+
+        db.query(sql, [pharmacyId], (err, result) => {
+
+            if (err) {
+                console.error("My Inventory Error:", err);
+
+                return res.status(500).json({
+                    success: false,
+                    message: "Failed to fetch inventory"
+                });
+            }
+
+            res.json({
+                success: true,
+                inventory: result
+            });
+        });
+    });
 };

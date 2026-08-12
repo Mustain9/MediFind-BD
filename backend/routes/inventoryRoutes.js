@@ -1,28 +1,37 @@
 const express = require("express");
-
 const router = express.Router();
+
+const verifyToken = require("../middleware/authMiddleware");
 
 const {
     getInventory,
     getPharmacyInventory,
+    getMyInventory,
     addInventory,
     updateInventory,
     deleteInventory
 } = require("../controllers/inventoryController");
 
+// Get logged-in pharmacy inventory
+router.get("/my-inventory", verifyToken, getMyInventory);
 
-router.get("/", getInventory);
+// Get all inventory
+router.get("/", verifyToken, getInventory);
 
+// Get specific pharmacy inventory
 router.get(
     "/pharmacy/:pharmacyId",
+    verifyToken,
     getPharmacyInventory
 );
 
-router.post("/", addInventory);
+// Add inventory
+router.post("/", verifyToken, addInventory);
 
-router.put("/:id", updateInventory);
+// Update inventory
+router.put("/:id", verifyToken, updateInventory);
 
-router.delete("/:id", deleteInventory);
-
+// Delete inventory
+router.delete("/:id", verifyToken, deleteInventory);
 
 module.exports = router;

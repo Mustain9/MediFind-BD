@@ -332,3 +332,44 @@ exports.rejectPharmacy = (req, res) => {
         }
     );
 };
+
+// ==========================================
+// GET LOGGED-IN USER'S PHARMACY
+// ==========================================
+exports.getMyPharmacy = (req, res) => {
+
+    const userId = req.user.id;
+
+    const sql = `
+        SELECT *
+        FROM pharmacies
+        WHERE user_id = ?
+        LIMIT 1
+    `;
+
+    db.query(sql, [userId], (err, result) => {
+
+        if (err) {
+            console.error("Get My Pharmacy Error:", err);
+
+            return res.status(500).json({
+                success: false,
+                message: "Failed to find pharmacy",
+                error: err.message
+            });
+        }
+
+        if (result.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: "No pharmacy found for this account"
+            });
+        }
+
+        res.json({
+            success: true,
+            pharmacy: result[0]
+        });
+
+    });
+};
