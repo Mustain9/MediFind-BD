@@ -11,22 +11,24 @@ const {
     searchMedicineAvailability
 } = require("../controllers/medicineController");
 
-
-// ==========================================
-// GET ALL MEDICINES / SEARCH
-// ==========================================
-router.get("/", getAllMedicines);
+const verifyToken =
+    require("../middleware/authMiddleware");
 
 
 // ==========================================
-// GET MEDICINE STATISTICS
+// PUBLIC - GET ALL MEDICINES / SEARCH
 // ==========================================
-router.get("/stats", getMedicineStats);
+
+router.get(
+    "/",
+    getAllMedicines
+);
 
 
 // ==========================================
-// SEARCH MEDICINE WITH PHARMACY AVAILABILITY
+// PUBLIC - MEDICINE AVAILABILITY SEARCH
 // ==========================================
+
 router.get(
     "/availability/search",
     searchMedicineAvailability
@@ -34,21 +36,47 @@ router.get(
 
 
 // ==========================================
-// ADD MEDICINE
+// ADMIN - MEDICINE STATISTICS
 // ==========================================
-router.post("/", addMedicine);
+
+router.get(
+    "/stats",
+    verifyToken,
+    getMedicineStats
+);
 
 
 // ==========================================
-// UPDATE MEDICINE
+// ADMIN - ADD MEDICINE
 // ==========================================
-router.put("/:id", updateMedicine);
+
+router.post(
+    "/",
+    verifyToken,
+    addMedicine
+);
 
 
 // ==========================================
-// DELETE MEDICINE
+// ADMIN - UPDATE MEDICINE
 // ==========================================
-router.delete("/:id", deleteMedicine);
+
+router.put(
+    "/:id",
+    verifyToken,
+    updateMedicine
+);
+
+
+// ==========================================
+// ADMIN - DELETE MEDICINE
+// ==========================================
+
+router.delete(
+    "/:id",
+    verifyToken,
+    deleteMedicine
+);
 
 
 module.exports = router;

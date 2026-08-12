@@ -232,6 +232,98 @@ const getAllUsers = (req, res) => {
     );
 };
 
+// ==========================================
+// ADMIN - UPDATE USER ROLE
+// ==========================================
+const updateUserRole = (req, res) => {
+
+    const adminRole = String(req.user.role || "")
+        .trim()
+        .toLowerCase();
+
+    if (
+        adminRole !== "admin" &&
+        adminRole !== "administrator"
+    ) {
+        return res.status(403).json({
+            success: false,
+            message: "Admin access required"
+        });
+    }
+
+    const { id } = req.params;
+    const { role } = req.body;
+
+    const allowedRoles = [
+        "customer",
+        "pharmacy",
+        "admin"
+    ];
+
+    if (!allowedRoles.includes(role)) {
+        return res.status(400).json({
+            success: false,
+            message: "Invalid role"
+        });
+    }
+
+    // Prevent admin from changing their own role
+    if (Number(id) === Number(req.user.id)) {
+        return res.status(400).json({
+            success: false,
+            message: "You cannot change your own admin role"
+        });
+    }
+
+    db.query(
+        "SELECT id FROM users WHERE id = ?",
+        [id],
+        (err, result) => {
+
+            if (err) {
+                console.error("Find User Error:", err);
+
+                return res.status(500).json({
+                    success: false,
+                    message: "Database error"
+                });
+            }
+
+            if (result.length === 0) {
+                return res.status(404).json({
+                    success: false,
+                    message: "User not found"
+                });
+            }
+
+            db.query(
+                "UPDATE users SET role = ? WHERE id = ?",
+                [role, id],
+                (err) => {
+
+                    if (err) {
+                        console.error(
+                            "Update User Role Error:",
+                            err
+                        );
+
+                        return res.status(500).json({
+                            success: false,
+                            message: "Failed to update user role"
+                        });
+                    }
+
+                    return res.json({
+                        success: true,
+                        message: "User role updated successfully"
+                    });
+
+                }
+            );
+        }
+    );
+};
+
 
 // ==========================================
 // EXPORT ALL CONTROLLERS
@@ -240,5 +332,6 @@ module.exports = {
     getProfile,
     updateProfile,
     changePassword,
-    getAllUsers
+    getAllUsers,
+    updateUserRole
 };

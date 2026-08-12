@@ -6,7 +6,8 @@ const {
     getProfile,
     updateProfile,
     changePassword,
-    getAllUsers
+    getAllUsers,
+    updateUserRole
 } = require("../controllers/userController");
 
 const authMiddleware =
@@ -21,6 +22,17 @@ router.get(
     "/admin/all",
     authMiddleware,
     getAllUsers
+);
+
+
+// ==========================================
+// ADMIN - UPDATE USER ROLE
+// ==========================================
+
+router.put(
+    "/admin/:id/role",
+    authMiddleware,
+    updateUserRole
 );
 
 

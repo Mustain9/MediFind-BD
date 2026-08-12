@@ -1,3 +1,14 @@
+import {
+  MapContainer,
+  TileLayer,
+  Marker,
+  Popup,
+  useMap
+} from "react-leaflet";
+
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
+
 import { useState, useEffect } from "react";
 import api from "./api";
 import {
@@ -11,6 +22,52 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   LineChart, Line, PieChart, Pie, Cell, Legend
 } from "recharts";
+
+const pharmacyIcon = new L.Icon({
+  iconUrl:
+    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png",
+
+  iconRetinaUrl:
+    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png",
+
+  shadowUrl:
+    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
+
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41],
+});
+
+function MapCenter({
+  pharmacy
+}: {
+  pharmacy: any | null;
+}) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (
+      pharmacy &&
+      pharmacy.latitude != null &&
+      pharmacy.longitude != null
+    ) {
+      map.flyTo(
+        [
+          Number(pharmacy.latitude),
+          Number(pharmacy.longitude)
+        ],
+        15,
+        {
+          duration: 1
+        }
+      );
+    }
+  }, [pharmacy, map]);
+
+  return null;
+}
+
 
 type Page =
   | "home" | "login" | "register" | "forgot-password"
@@ -3808,159 +3865,106 @@ function PharmacyLocatorPage() {
                     )}
 
                 </div>
+                    {/* ==========================================
+                        REAL INTERACTIVE MAP
+                    ========================================== */}
 
+                    <div className="col-span-2 bg-slate-200 rounded-2xl overflow-hidden relative">
 
-                {/* ==========================================
-                    MAP AREA
-                ========================================== */}
+                      <MapContainer
+                        center={[23.8103, 90.4125]}
+                        zoom={11}
+                        scrollWheelZoom={true}
+                        className="w-full h-full"
+                        style={{ minHeight: "580px" }}
+                      >
 
-                <div className="col-span-2 bg-slate-200 rounded-2xl overflow-hidden relative">
+                        <TileLayer
+                          attribution="&copy; OpenStreetMap contributors"
+                          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                        />
 
-                    <img
-                        src="https://images.unsplash.com/photo-1524661135-423995f22d0b?w=900&h=600&fit=crop&auto=format"
-                        alt="Map view"
-                        className="w-full h-full object-cover"
-                    />
+                        <MapCenter
+                          pharmacy={
+                            selected
+                              ? pharmacies.find(
+                                  (p) => p.id === selected
+                                ) || null
+                              : null
+                          }
+                        />
 
+                        {pharmacies.map((pharmacy) => {
 
-                    <div className="absolute inset-0 bg-blue-900/10" />
+                          const latitude =
+                            Number(pharmacy.latitude);
 
+                          const longitude =
+                            Number(pharmacy.longitude);
 
-                    {/* Location label */}
+                          if (
+                            !Number.isFinite(latitude) ||
+                            !Number.isFinite(longitude)
+                          ) {
+                            return null;
+                          }
 
-                    <div className="absolute top-4 left-4 bg-white rounded-xl px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm">
+                          return (
+                            <Marker
+                              key={pharmacy.id}
+                              position={[
+                                latitude,
+                                longitude
+                              ]}
+                              icon={pharmacyIcon}
+                              eventHandlers={{
+                                click: () =>
+                                  setSelected(pharmacy.id)
+                              }}
+                            >
 
-                        📍 Bangladesh
+                              <Popup>
 
-                    </div>
+                                <div className="min-w-[220px]">
 
+                                  <h3 className="font-bold text-slate-800 text-sm">
+                                    {pharmacy.pharmacy_name}
+                                  </h3>
 
-                    {/* Pharmacy markers */}
+                                  <p className="text-xs text-slate-500 mt-1">
+                                    {pharmacy.address ||
+                                      "Address unavailable"}
+                                  </p>
 
-                    {pharmacies.map(
-                        (pharmacy, index) => {
+                                  <p className="text-xs text-slate-500 mt-2">
+                                    📞 {pharmacy.phone ||
+                                      "No phone"}
+                                  </p>
 
-                            const left =
-                                15 +
-                                (index * 17) % 70;
+                                  <p className="text-xs text-green-600 font-semibold mt-1">
+                                    ✓ Verified Pharmacy
+                                  </p>
 
-                            const top =
-                                25 +
-                                (index * 23) % 50;
-
-
-                            return (
-
-                                <div
-                                    key={pharmacy.id}
+                                  <button
                                     onClick={() =>
-                                        setSelected(
-                                            pharmacy.id
-                                        )
+                                      getDirections(pharmacy)
                                     }
-                                    className={`absolute w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold cursor-pointer shadow-lg transition-all ${
-                                        selected === pharmacy.id
-                                            ? "bg-blue-600 scale-125"
-                                            : "bg-green-500 hover:scale-110"
-                                    }`}
-                                    style={{
-                                        left: `${left}%`,
-                                        top: `${top}%`
-                                    }}
-                                    title={
-                                        pharmacy.pharmacy_name
-                                    }
-                                >
-
-                                    {index + 1}
+                                    className="mt-3 w-full px-3 py-2 bg-blue-600 text-white rounded-lg text-xs font-semibold hover:bg-blue-700"
+                                  >
+                                    Get Directions
+                                  </button>
 
                                 </div>
 
-                            );
+                              </Popup>
 
-                        }
-                    )}
+                            </Marker>
+                          );
+                        })}
 
-
-                    {/* Selected pharmacy */}
-
-                    {selected && (
-
-                        <div className="absolute bottom-4 left-4 bg-white rounded-xl px-4 py-3 shadow-lg max-w-xs">
-
-                            {(() => {
-
-                                const pharmacy =
-                                    pharmacies.find(
-                                        (p) =>
-                                            p.id === selected
-                                    );
-
-
-                                if (!pharmacy) {
-                                    return null;
-                                }
-
-
-                                return (
-
-                                    <div>
-
-                                        <p className="text-sm font-bold text-slate-800">
-
-                                            {pharmacy.pharmacy_name}
-
-                                        </p>
-
-                                        <p className="text-xs text-slate-400 mt-1">
-
-                                            {pharmacy.address}
-
-                                        </p>
-
-                                        <button
-                                            onClick={() =>
-                                                getDirections(
-                                                    pharmacy
-                                                )
-                                            }
-                                            className="mt-2 text-xs font-semibold text-blue-600 hover:underline"
-                                        >
-
-                                            Get Directions →
-
-                                        </button>
-
-                                    </div>
-
-                                );
-
-                            })()}
-
-                        </div>
-
-                    )}
-
-
-                    {/* Zoom buttons */}
-
-                    <div className="absolute bottom-4 right-4 flex flex-col gap-2">
-
-                        <button
-                            className="w-8 h-8 bg-white rounded-lg shadow flex items-center justify-center text-slate-600 hover:bg-slate-50 font-bold"
-                        >
-                            +
-                        </button>
-
-                        <button
-                            className="w-8 h-8 bg-white rounded-lg shadow flex items-center justify-center text-slate-600 hover:bg-slate-50 font-bold"
-                        >
-                            −
-                        </button>
+                      </MapContainer>
 
                     </div>
-
-                </div>
 
             </div>
 
@@ -7255,6 +7259,12 @@ function AdminUserManagement() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
+  const [selectedUser, setSelectedUser] = useState<any | null>(null);
+  const [roleUser, setRoleUser] =
+  useState<any | null>(null);
+
+const [newRole, setNewRole] =
+  useState("");
 
 
   // ==========================================
@@ -7410,6 +7420,41 @@ function AdminUserManagement() {
     );
 
   }
+              const handleRoleChange = async () => {
+
+              if (!roleUser) {
+                return;
+              }
+
+              try {
+
+                await api.put(
+                  `/user/admin/${roleUser.id}/role`,
+                  {
+                    role: newRole
+                  }
+                );
+
+                alert("User role updated successfully.");
+
+                setRoleUser(null);
+
+                await loadUsers();
+
+              } catch (error: any) {
+
+                console.error(
+                  "Role update error:",
+                  error
+                );
+
+                alert(
+                  error?.response?.data?.message ||
+                  "Failed to update user role."
+                );
+
+              }
+            };
 
 
   // ==========================================
@@ -7599,11 +7644,12 @@ function AdminUserManagement() {
               <tr>
 
                 {[
-                  "ID",
-                  "User",
-                  "Email",
-                  "Phone",
-                  "Role"
+                    "ID",
+                    "User",
+                    "Email",
+                    "Phone",
+                    "Role",
+                    "Actions"
                 ].map((heading) => (
 
                   <th
@@ -7691,6 +7737,29 @@ function AdminUserManagement() {
 
                     </td>
 
+                    <td className="px-6 py-4">
+
+                        <button
+                          onClick={() => setSelectedUser(user)}
+                          className="px-3 py-1.5 bg-blue-50 text-blue-600 text-xs rounded-lg font-semibold hover:bg-blue-100 flex items-center gap-1"
+                        >
+                          <Eye size={13} />
+                          View
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            setRoleUser(user);
+                            setNewRole(user.role || "customer");
+                          }}
+                          className="px-3 py-1.5 bg-amber-50 text-amber-600 text-xs rounded-lg font-semibold hover:bg-amber-100 flex items-center gap-1"
+                        >
+                          <Shield size={13} />
+                          Role
+                        </button>
+
+                      </td>
+
                   </tr>
 
                 )
@@ -7703,6 +7772,301 @@ function AdminUserManagement() {
         )}
 
       </div>
+
+
+      {/* ========================================== */}
+      {/* USER DETAILS MODAL */}
+      {/* ========================================== */}
+
+      {selectedUser && (
+
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => setSelectedUser(null)}
+        >
+
+          <div
+            className="w-full max-w-md bg-white rounded-2xl shadow-xl p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+
+            {/* HEADER */}
+
+            <div className="flex items-center justify-between mb-6">
+
+              <div className="flex items-center gap-3">
+
+                <div className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center">
+
+                  <User
+                    size={22}
+                    className="text-blue-600"
+                  />
+
+                </div>
+
+                <div>
+
+                  <h2 className="text-lg font-bold text-slate-800">
+                    User Details
+                  </h2>
+
+                  <p className="text-xs text-slate-400">
+                    User #{selectedUser.id}
+                  </p>
+
+                </div>
+
+              </div>
+
+
+              <button
+                onClick={() => setSelectedUser(null)}
+                className="w-8 h-8 rounded-lg hover:bg-slate-100 text-slate-500 flex items-center justify-center"
+              >
+
+                <X size={18} />
+
+              </button>
+
+            </div>
+
+
+            {/* USER INFORMATION */}
+
+            <div className="space-y-4">
+
+              {/* NAME */}
+
+              <div>
+
+                <label className="text-xs font-semibold text-slate-400 uppercase tracking-wide">
+                  Full Name
+                </label>
+
+                <p className="mt-1 text-sm font-semibold text-slate-800">
+                  {selectedUser.full_name || "—"}
+                </p>
+
+              </div>
+
+
+              {/* EMAIL */}
+
+              <div>
+
+                <label className="text-xs font-semibold text-slate-400 uppercase tracking-wide">
+                  Email
+                </label>
+
+                <p className="mt-1 text-sm text-slate-700">
+                  {selectedUser.email || "—"}
+                </p>
+
+              </div>
+
+
+              {/* PHONE */}
+
+              <div>
+
+                <label className="text-xs font-semibold text-slate-400 uppercase tracking-wide">
+                  Phone
+                </label>
+
+                <p className="mt-1 text-sm text-slate-700">
+                  {selectedUser.phone || "—"}
+                </p>
+
+              </div>
+
+
+              {/* ROLE */}
+
+              <div>
+
+                <label className="text-xs font-semibold text-slate-400 uppercase tracking-wide">
+                  Role
+                </label>
+
+                <div className="mt-2">
+
+                  <span
+                    className={`px-3 py-1 rounded-full text-xs font-semibold ${getRoleStyle(
+                      selectedUser.role
+                    )}`}
+                  >
+
+                    {String(
+                      selectedUser.role || "unknown"
+                    )
+                      .charAt(0)
+                      .toUpperCase() +
+                      String(
+                        selectedUser.role || "unknown"
+                      ).slice(1)}
+
+                  </span>
+
+                </div>
+
+              </div>
+
+
+              {/* ACCOUNT TYPE */}
+
+              <div>
+
+                <label className="text-xs font-semibold text-slate-400 uppercase tracking-wide">
+                  Account Type
+                </label>
+
+                <p className="mt-1 text-sm text-slate-700">
+
+                  {String(selectedUser.role).toLowerCase() === "pharmacy"
+                    ? "Pharmacy Account"
+                    : String(selectedUser.role).toLowerCase() === "admin"
+                    ? "Administrator Account"
+                    : "Customer Account"}
+
+                </p>
+
+              </div>
+
+            </div>
+
+{/* CLOSE BUTTON */}
+
+<button
+  onClick={() => setSelectedUser(null)}
+  className="mt-6 w-full py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700"
+>
+  Close
+</button>
+
+          </div>
+
+        </div>
+
+      )}
+
+
+      {/* ========================================== */}
+      {/* CHANGE USER ROLE MODAL */}
+      {/* ========================================== */}
+
+      {roleUser && (
+
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => setRoleUser(null)}
+        >
+
+          <div
+            className="w-full max-w-md bg-white rounded-2xl shadow-xl p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+
+            {/* HEADER */}
+
+            <div className="flex items-center justify-between mb-6">
+
+              <div>
+
+                <h2 className="text-lg font-bold text-slate-800">
+                  Change User Role
+                </h2>
+
+                <p className="text-xs text-slate-400 mt-1">
+                  {roleUser.full_name}
+                </p>
+
+              </div>
+
+              <button
+                onClick={() => setRoleUser(null)}
+                className="w-8 h-8 rounded-lg hover:bg-slate-100 text-slate-500 flex items-center justify-center"
+              >
+                <X size={18} />
+              </button>
+
+            </div>
+
+
+            {/* CURRENT ROLE */}
+
+            <div className="mb-4">
+
+              <label className="text-xs font-semibold text-slate-400 uppercase tracking-wide">
+                Current Role
+              </label>
+
+              <p className="mt-1 text-sm font-semibold text-slate-700">
+                {String(roleUser.role || "unknown")
+                  .charAt(0)
+                  .toUpperCase() +
+                  String(roleUser.role || "unknown").slice(1)}
+              </p>
+
+            </div>
+
+
+            {/* SELECT ROLE */}
+
+            <div>
+
+              <label className="text-xs font-semibold text-slate-400 uppercase tracking-wide">
+                New Role
+              </label>
+
+              <select
+                value={newRole}
+                onChange={(e) => setNewRole(e.target.value)}
+                className="mt-2 w-full px-4 py-3 rounded-xl border border-slate-200 text-sm text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+              >
+
+                <option value="customer">
+                  Customer
+                </option>
+
+                <option value="pharmacy">
+                  Pharmacy
+                </option>
+
+                <option value="admin">
+                  Admin
+                </option>
+
+              </select>
+
+            </div>
+
+
+            {/* BUTTONS */}
+
+            <div className="flex gap-3 mt-6">
+
+              <button
+                onClick={() => setRoleUser(null)}
+                className="flex-1 py-2.5 border border-slate-200 text-slate-600 rounded-xl text-sm font-semibold hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+
+              <button
+                onClick={handleRoleChange}
+                className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700"
+              >
+                Save Role
+              </button>
+
+            </div>
+
+          </div>
+
+        </div>
+
+      )}
 
     </div>
 
@@ -8131,13 +8495,17 @@ function AdminMedicineManagement() {
 
   const [editingId, setEditingId] = useState<number | null>(null);
 
+  const [categories, setCategories] = useState<any[]>([]);
+  const [manufacturers, setManufacturers] = useState<any[]>([]);
+
   const [newMedicine, setNewMedicine] = useState({
-      brand_name: "",
-      generic_name: "",
-      manufacturer: "",
-      category: "",
-      strength: "",
-      description: ""
+    brand_name: "",
+    generic_name: "",
+    manufacturer_id: "",
+    category_id: "",
+    strength: "",
+    dosage_form: "",
+    description: ""
   });
 
   const [stats, setStats] = useState({
@@ -8147,16 +8515,14 @@ function AdminMedicineManagement() {
     totalGenerics: 0
 });
 
-  useEffect(() => {
-    loadMedicines();
-    loadStats();
-  }, []);
-
   const loadMedicines = async () => {
     try {
       const response = await fetch("http://localhost:5000/api/medicines");
       const data = await response.json();
-      setMedicines(data);
+
+      if (data.success) {
+        setStats(data.statistics);
+      }
     } catch (err) {
       console.log(err);
     }
@@ -8181,50 +8547,69 @@ function AdminMedicineManagement() {
     }
 
 };
+
   const addMedicine = async () => {
+  try {
+    const response = await api.post("/medicines", {
+      brand_name: newMedicine.brand_name,
+      generic_name: newMedicine.generic_name,
 
-    try{
+      manufacturer_id: newMedicine.manufacturer_id
+        ? Number(newMedicine.manufacturer_id)
+        : null,
 
-        const response = await fetch(
-            "http://localhost:5000/api/medicines",
-            {
-                method:"POST",
-                headers:{
-                    "Content-Type":"application/json"
-                },
-                body:JSON.stringify(newMedicine)
-            }
-        );
+      category_id: newMedicine.category_id
+        ? Number(newMedicine.category_id)
+        : null,
 
-        const data = await response.json();
+      strength: newMedicine.strength,
+      dosage_form: newMedicine.dosage_form,
+      description: newMedicine.description
+    });
 
-        if(data.success){
+    const data = response.data;
 
-            alert("Medicine Added Successfully");
-
-            setShowAddModal(false);
-
-            setNewMedicine({
-                brand_name:"",
-                generic_name:"",
-                manufacturer:"",
-                category:"",
-                strength:"",
-                description:""
-            });
-
-            loadMedicines();
-            loadStats();
-
-        }
-
-    }catch(err){
-
-        console.log(err);
-
+    if (!data.success) {
+      alert(data.message || "Failed to add medicine");
+      return;
     }
 
+    alert("Medicine Added Successfully");
+
+    setShowAddModal(false);
+
+    setNewMedicine({
+      brand_name: "",
+      generic_name: "",
+      manufacturer_id: "",
+      category_id: "",
+      strength: "",
+      dosage_form: "",
+      description: ""
+    });
+
+    await loadMedicines();
+    await loadStats();
+
+  } catch (error: any) {
+
+    console.error(
+      "Add Medicine Error:",
+      error
+    );
+
+    console.error(
+      "Server response:",
+      error?.response?.data
+    );
+
+    alert(
+      error?.response?.data?.message ||
+      "Failed to add medicine"
+    );
+  }
 };
+
 const editMedicine = async () => {
 
     try {
@@ -8296,6 +8681,43 @@ const deleteMedicine = async (id: number) => {
     }
 
 };
+
+      const loadMedicineOptions = async () => {
+        try {
+          const [categoryRes, manufacturerRes] = await Promise.all([
+            fetch("http://localhost:5000/api/categories"),
+            fetch("http://localhost:5000/api/manufacturers")
+          ]);
+
+          const categoryData = await categoryRes.json();
+          const manufacturerData = await manufacturerRes.json();
+
+          setCategories(
+            categoryData.categories ||
+            categoryData ||
+            []
+          );
+
+          setManufacturers(
+            manufacturerData.manufacturers ||
+            manufacturerData ||
+            []
+          );
+
+        } catch (error) {
+          console.error(
+            "Failed to load medicine options:",
+            error
+          );
+        }
+      };
+
+      useEffect(() => {
+      loadMedicines();
+      loadStats();
+      loadMedicineOptions();
+      }, []);
+
   return (
     <div className="p-6 space-y-5">
       <div className="flex items-center justify-between">
@@ -8355,10 +8777,14 @@ const deleteMedicine = async (id: number) => {
           </thead>
           <tbody className="divide-y divide-slate-50">
             {medicines
-              .filter(m =>
-                  m.brand_name.toLowerCase().includes(search.toLowerCase()) ||
-                  m.generic_name.toLowerCase().includes(search.toLowerCase())
-              )
+                .filter(m =>
+                  (m.brand_name || "")
+                    .toLowerCase()
+                    .includes(search.toLowerCase()) ||
+                  (m.generic_name || "")
+                    .toLowerCase()
+                    .includes(search.toLowerCase())
+                )
               .map(m => (
               <tr key={m.id} className="hover:bg-slate-50/50 transition-colors">
                 <td className="px-6 py-4 text-sm font-semibold text-slate-800">{m.brand_name}</td>
@@ -8402,102 +8828,242 @@ const deleteMedicine = async (id: number) => {
           </tbody>
         </table>
       </div>
+{showAddModal && (
+  <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
 
-      {showAddModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+    <div className="bg-white rounded-2xl w-full max-w-[500px] p-6 space-y-4">
 
-        <div className="bg-white rounded-2xl w-[500px] p-6 space-y-4">
+      {/* HEADER */}
+      <div>
+        <h2 className="text-xl font-bold text-slate-800">
+          Add Medicine
+        </h2>
 
-          <h2 className="text-xl font-bold">
-        Add Medicine
-      </h2>
+        <p className="text-sm text-slate-400 mt-1">
+          Add a new medicine to the master database
+        </p>
+      </div>
 
-      <input
-        placeholder="Brand Name"
-        value={newMedicine.brand_name}
-        onChange={(e)=>
-          setNewMedicine({
-            ...newMedicine,
-            brand_name:e.target.value
-          })
-        }
-        className="w-full border rounded-lg p-3"
-      />
 
-      <input
-        placeholder="Generic Name"
-        value={newMedicine.generic_name}
-        onChange={(e)=>
-          setNewMedicine({
-            ...newMedicine,
-            generic_name:e.target.value
-          })
-        }
-        className="w-full border rounded-lg p-3"
-      />
+      {/* BRAND NAME */}
+      <div>
+        <label className="block text-sm font-semibold text-slate-600 mb-2">
+          Brand Name
+        </label>
 
-      <input
-        placeholder="Manufacturer"
-        value={newMedicine.manufacturer}
-        onChange={(e)=>
-          setNewMedicine({
-            ...newMedicine,
-            manufacturer:e.target.value
-          })
-        }
-        className="w-full border rounded-lg p-3"
-      />
+        <input
+          type="text"
+          placeholder="Enter brand name"
+          value={newMedicine.brand_name}
+          onChange={(e) =>
+            setNewMedicine({
+              ...newMedicine,
+              brand_name: e.target.value
+            })
+          }
+          className="w-full border border-slate-200 rounded-xl p-3 outline-none focus:border-blue-400"
+        />
+      </div>
 
-      <input
-        placeholder="Category"
-        value={newMedicine.category}
-        onChange={(e)=>
-          setNewMedicine({
-            ...newMedicine,
-            category:e.target.value
-          })
-        }
-        className="w-full border rounded-lg p-3"
-      />
 
-      <input
-        placeholder="Strength"
-        value={newMedicine.strength}
-        onChange={(e)=>
-          setNewMedicine({
-            ...newMedicine,
-            strength:e.target.value
-          })
-        }
-        className="w-full border rounded-lg p-3"
-      />
+      {/* GENERIC NAME */}
+      <div>
+        <label className="block text-sm font-semibold text-slate-600 mb-2">
+          Generic Name
+        </label>
 
-      <textarea
-        placeholder="Description"
-        value={newMedicine.description}
-        onChange={(e)=>
-          setNewMedicine({
-            ...newMedicine,
-            description:e.target.value
-          })
-        }
-        className="w-full border rounded-lg p-3"
-      />
+        <input
+          type="text"
+          placeholder="Enter generic name"
+          value={newMedicine.generic_name}
+          onChange={(e) =>
+            setNewMedicine({
+              ...newMedicine,
+              generic_name: e.target.value
+            })
+          }
+          className="w-full border border-slate-200 rounded-xl p-3 outline-none focus:border-blue-400"
+        />
+      </div>
 
-      <div className="flex justify-end gap-3">
+
+      {/* MANUFACTURER */}
+      <div>
+        <label className="block text-sm font-semibold text-slate-600 mb-2">
+          Manufacturer
+        </label>
+
+        <select
+          value={newMedicine.manufacturer_id}
+          onChange={(e) =>
+            setNewMedicine({
+              ...newMedicine,
+              manufacturer_id: e.target.value
+            })
+          }
+          className="w-full border border-slate-200 rounded-xl p-3 outline-none focus:border-blue-400 bg-white"
+        >
+          <option value="">
+            Select Manufacturer
+          </option>
+
+          {manufacturers.map((manufacturer) => (
+            <option
+              key={manufacturer.id}
+              value={manufacturer.id}
+            >
+              {manufacturer.manufacturer_name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+
+      {/* CATEGORY */}
+      <div>
+        <label className="block text-sm font-semibold text-slate-600 mb-2">
+          Category
+        </label>
+
+        <select
+          value={newMedicine.category_id}
+          onChange={(e) =>
+            setNewMedicine({
+              ...newMedicine,
+              category_id: e.target.value
+            })
+          }
+          className="w-full border border-slate-200 rounded-xl p-3 outline-none focus:border-blue-400 bg-white"
+        >
+          <option value="">
+            Select Category
+          </option>
+
+          {categories.map((category) => (
+            <option
+              key={category.id}
+              value={category.id}
+            >
+              {category.category_name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+
+      {/* STRENGTH */}
+      <div>
+        <label className="block text-sm font-semibold text-slate-600 mb-2">
+          Strength
+        </label>
+
+        <input
+          type="text"
+          placeholder="Example: 500 mg"
+          value={newMedicine.strength}
+          onChange={(e) =>
+            setNewMedicine({
+              ...newMedicine,
+              strength: e.target.value
+            })
+          }
+          className="w-full border border-slate-200 rounded-xl p-3 outline-none focus:border-blue-400"
+        />
+      </div>
+
+
+      {/* DOSAGE FORM */}
+      <div>
+        <label className="block text-sm font-semibold text-slate-600 mb-2">
+          Dosage Form
+        </label>
+
+        <select
+          value={newMedicine.dosage_form}
+          onChange={(e) =>
+            setNewMedicine({
+              ...newMedicine,
+              dosage_form: e.target.value
+            })
+          }
+          className="w-full border border-slate-200 rounded-xl p-3 outline-none focus:border-blue-400 bg-white"
+        >
+          <option value="">
+            Select Dosage Form
+          </option>
+
+          <option value="Tablet">
+            Tablet
+          </option>
+
+          <option value="Capsule">
+            Capsule
+          </option>
+
+          <option value="Syrup">
+            Syrup
+          </option>
+
+          <option value="Injection">
+            Injection
+          </option>
+
+          <option value="Cream">
+            Cream
+          </option>
+
+          <option value="Ointment">
+            Ointment
+          </option>
+
+          <option value="Drops">
+            Drops
+          </option>
+
+          <option value="Inhaler">
+            Inhaler
+          </option>
+        </select>
+      </div>
+
+
+      {/* DESCRIPTION */}
+      <div>
+        <label className="block text-sm font-semibold text-slate-600 mb-2">
+          Description
+        </label>
+
+        <textarea
+          placeholder="Enter medicine description"
+          value={newMedicine.description}
+          onChange={(e) =>
+            setNewMedicine({
+              ...newMedicine,
+              description: e.target.value
+            })
+          }
+          rows={3}
+          className="w-full border border-slate-200 rounded-xl p-3 outline-none focus:border-blue-400 resize-none"
+        />
+      </div>
+
+
+      {/* BUTTONS */}
+      <div className="flex justify-end gap-3 pt-2">
 
         <button
-          onClick={()=>setShowAddModal(false)}
-          className="px-5 py-2 rounded-lg border"
+          onClick={() => setShowAddModal(false)}
+          className="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-semibold text-sm hover:bg-slate-50"
         >
           Cancel
         </button>
 
+
         <button
           onClick={addMedicine}
-          className="px-5 py-2 rounded-lg bg-blue-600 text-white"
+          className="px-5 py-2.5 rounded-xl bg-blue-600 text-white font-semibold text-sm hover:bg-blue-700"
         >
-          Save
+          Save Medicine
         </button>
 
       </div>

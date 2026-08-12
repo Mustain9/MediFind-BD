@@ -13,6 +13,7 @@ const inventoryRoutes = require("./routes/inventoryRoutes");
 const pharmacyRoutes = require("./routes/pharmacyRoutes");
 const reservationRoutes = require("./routes/reservationRoutes");
 const adminRoutes = require("./routes/adminRoutes");
+const manufacturerRoutes = require("./routes/manufacturerRoutes");
 
 const verifyToken = require("./middleware/authMiddleware");
 
@@ -82,6 +83,8 @@ app.use("/api/inventory", inventoryRoutes);
 // ==========================================
 
 app.use("/api/pharmacies", pharmacyRoutes);
+app.use("/api/manufacturers", manufacturerRoutes);
+app.use("/api/reservations", reservationRoutes);
 
 // ==========================================
 // RESERVATION ROUTES

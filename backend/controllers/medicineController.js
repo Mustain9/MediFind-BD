@@ -1,5 +1,20 @@
 const db = require("../config/db");
 
+// ==========================================
+// ADMIN ACCESS CHECK
+// ==========================================
+const isAdmin = (req) => {
+
+    const role = String(req.user?.role || "")
+        .trim()
+        .toLowerCase();
+
+    return (
+        role === "admin" ||
+        role === "administrator"
+    );
+};
+
 // Get All Medicines
 exports.getAllMedicines = (req, res) => {
 
@@ -30,8 +45,17 @@ exports.getAllMedicines = (req, res) => {
 
 };
 
-// Add Medicine
+// ==========================================
+// ADD MEDICINE
+// ==========================================
 exports.addMedicine = (req, res) => {
+
+    if (!isAdmin(req)) {
+        return res.status(403).json({
+            success: false,
+            message: "Admin access required"
+        });
+    }
 
     const {
         brand_name,
@@ -81,7 +105,11 @@ exports.addMedicine = (req, res) => {
         (err, result) => {
 
             if (err) {
-                console.error("Add Medicine SQL Error:", err);
+
+                console.error(
+                    "Add Medicine SQL Error:",
+                    err
+                );
 
                 return res.status(500).json({
                     success: false,
@@ -99,8 +127,17 @@ exports.addMedicine = (req, res) => {
         }
     );
 };
+
+
 // Update Medicine
 exports.updateMedicine = (req, res) => {
+
+    if (!isAdmin(req)) {
+        return res.status(403).json({
+            success: false,
+            message: "Admin access required"
+        });
+    }
 
     const { id } = req.params;
 
@@ -145,15 +182,26 @@ exports.updateMedicine = (req, res) => {
             status || "active",
             id
         ],
-        (err) => {
+        (err, result) => {
 
             if (err) {
-                console.error("Update Medicine SQL Error:", err);
+
+                console.error(
+                    "Update Medicine SQL Error:",
+                    err
+                );
 
                 return res.status(500).json({
                     success: false,
                     message: "Failed to update medicine",
                     error: err.message
+                });
+            }
+
+            if (result.affectedRows === 0) {
+                return res.status(404).json({
+                    success: false,
+                    message: "Medicine not found"
                 });
             }
 
@@ -169,15 +217,39 @@ exports.updateMedicine = (req, res) => {
 // Delete Medicine
 exports.deleteMedicine = (req, res) => {
 
+    if (!isAdmin(req)) {
+        return res.status(403).json({
+            success: false,
+            message: "Admin access required"
+        });
+    }
+
     const { id } = req.params;
 
     db.query(
         "DELETE FROM medicines WHERE id=?",
         [id],
-        (err) => {
+        (err, result) => {
 
             if (err) {
-                return res.status(500).json(err);
+
+                console.error(
+                    "Delete Medicine Error:",
+                    err
+                );
+
+                return res.status(500).json({
+                    success: false,
+                    message: "Failed to delete medicine",
+                    error: err.message
+                });
+            }
+
+            if (result.affectedRows === 0) {
+                return res.status(404).json({
+                    success: false,
+                    message: "Medicine not found"
+                });
             }
 
             res.json({
@@ -187,7 +259,6 @@ exports.deleteMedicine = (req, res) => {
 
         }
     );
-
 };
 
 // Get Medicine Statistics
