@@ -12,6 +12,7 @@ const categoryRoutes = require("./routes/categoryRoutes");
 const inventoryRoutes = require("./routes/inventoryRoutes");
 const pharmacyRoutes = require("./routes/pharmacyRoutes");
 const reservationRoutes = require("./routes/reservationRoutes");
+const adminRoutes = require("./routes/adminRoutes");
 
 const verifyToken = require("./middleware/authMiddleware");
 
@@ -23,6 +24,7 @@ const app = express();
 
 app.use(cors());
 app.use(express.json());
+
 
 // ==========================================
 // BASIC ROUTES
@@ -38,6 +40,12 @@ app.get("/api/test", (req, res) => {
         message: "Backend Connected Successfully"
     });
 });
+
+// ==========================================
+// ADMIN ROUTES
+// ==========================================
+
+app.use("/api/admin", adminRoutes);
 
 // ==========================================
 // AUTH ROUTES

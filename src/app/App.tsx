@@ -6460,110 +6460,794 @@ function PharmacyProfile() {
     );
 }
 
-function AdminDashboard({ setPage }: { setPage: (p: Page) => void }) {
+function AdminDashboard({
+  setPage
+}: {
+  setPage: (p: Page) => void;
+}) {
+  const [users, setUsers] = useState<any[]>([]);
+  const [pharmacies, setPharmacies] = useState<any[]>([]);
+  const [medicines, setMedicines] = useState<any[]>([]);
+  const [reservations, setReservations] = useState<any[]>([]);
+
+  const [loading, setLoading] = useState(true);
+
+  // ==========================================
+  // DASHBOARD STATS
+  // ==========================================
+
+  const [dashboardStats, setDashboardStats] = useState({
+    totalUsers: 0,
+    totalPharmacies: 0,
+    approvedPharmacies: 0,
+    pendingPharmacies: 0,
+    rejectedPharmacies: 0,
+    totalMedicines: 0,
+    totalReservations: 0,
+    todayReservations: 0,
+    pendingReservations: 0,
+    pendingPharmacyList: [] as any[]
+  });
+
+  // ==========================================
+  // LOAD ADMIN DASHBOARD DATA
+  // ==========================================
+
+  const loadDashboard = async () => {
+    try {
+      setLoading(true);
+
+      const response = await api.get("/admin/dashboard");
+
+      console.log(
+        "Admin Dashboard Response:",
+        response.data
+      );
+
+      if (!response.data?.success) {
+        throw new Error(
+          response.data?.message ||
+          "Failed to load dashboard"
+        );
+      }
+
+      const stats = response.data.stats || {};
+
+      const pendingPharmacies =
+        response.data.pendingPharmacies || [];
+
+      // ==========================================
+      // USERS
+      // ==========================================
+
+      setUsers(
+        Array.from({
+          length: Number(stats.totalUsers || 0)
+        })
+      );
+
+      // ==========================================
+      // PHARMACIES
+      // ==========================================
+
+      setPharmacies([
+        ...Array.from({
+          length: Number(stats.approvedPharmacies || 0)
+        }).map(() => ({
+          status: "approved"
+        })),
+
+        ...Array.from({
+          length: Number(stats.pendingPharmacies || 0)
+        }).map(() => ({
+          status: "pending"
+        })),
+
+        ...Array.from({
+          length: Number(stats.rejectedPharmacies || 0)
+        }).map(() => ({
+          status: "rejected"
+        }))
+      ]);
+
+      // ==========================================
+      // MEDICINES
+      // ==========================================
+
+      setMedicines(
+        Array.from({
+          length: Number(stats.totalMedicines || 0)
+        })
+      );
+
+      // ==========================================
+      // RESERVATIONS
+      // ==========================================
+
+      setReservations(
+        Array.from({
+          length: Number(stats.totalReservations || 0)
+        }).map(() => ({
+          status: "completed"
+        }))
+      );
+
+      // ==========================================
+      // SAVE DASHBOARD STATS
+      // ==========================================
+
+      setDashboardStats({
+        totalUsers: Number(stats.totalUsers || 0),
+
+        totalPharmacies:
+          Number(stats.totalPharmacies || 0),
+
+        approvedPharmacies:
+          Number(stats.approvedPharmacies || 0),
+
+        pendingPharmacies:
+          Number(stats.pendingPharmacies || 0),
+
+        rejectedPharmacies:
+          Number(stats.rejectedPharmacies || 0),
+
+        totalMedicines:
+          Number(stats.totalMedicines || 0),
+
+        totalReservations:
+          Number(stats.totalReservations || 0),
+
+        todayReservations:
+          Number(stats.todayReservations || 0),
+
+        pendingReservations:
+          Number(stats.pendingReservations || 0),
+
+        pendingPharmacyList:
+          pendingPharmacies
+      });
+
+    } catch (error: any) {
+
+      console.error(
+        "Admin dashboard loading error:",
+        error?.response?.data || error
+      );
+
+      alert(
+        error?.response?.data?.message ||
+        "Failed to load admin dashboard"
+      );
+
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ==========================================
+  // LOAD WHEN PAGE OPENS
+  // ==========================================
+
+  useEffect(() => {
+    loadDashboard();
+  }, []);
+
+  // ==========================================
+  // STATISTICS
+  // IMPORTANT:
+  // DO NOT DECLARE THESE AGAIN BELOW
+  // ==========================================
+
+  const totalUsers =
+    dashboardStats.totalUsers;
+
+  const totalPharmacies =
+    dashboardStats.totalPharmacies;
+
+  const approvedPharmacies =
+    dashboardStats.approvedPharmacies;
+
+  const pendingPharmacies =
+    dashboardStats.pendingPharmacies;
+
+  const rejectedPharmacies =
+    dashboardStats.rejectedPharmacies;
+
+  const totalMedicines =
+    dashboardStats.totalMedicines;
+
+  const totalReservations =
+    dashboardStats.totalReservations;
+
+  const todayReservations =
+    dashboardStats.todayReservations;
+
+  const pendingReservations =
+    dashboardStats.pendingReservations;
+
+  const pendingPharmacyList =
+    dashboardStats.pendingPharmacyList;
+
+  // ==========================================
+  // LOADING
+  // ==========================================
+
+  if (loading) {
+    return (
+      <div className="p-6">
+        <div className="bg-white rounded-2xl p-10 text-center shadow-sm border border-black/5">
+
+          <div className="inline-block w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-3" />
+
+          <p className="text-sm text-slate-500">
+            Loading admin dashboard...
+          </p>
+
+        </div>
+      </div>
+    );
+  }
+
+  // ==========================================
+  // DASHBOARD
+  // ==========================================
+
   return (
     <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-800">Admin Dashboard</h1>
-        <p className="text-slate-500 text-sm mt-1">MediFind BD System Overview · 27 Jun 2026</p>
+
+      {/* ========================================
+          HEADER
+      ======================================== */}
+
+      <div className="flex items-center justify-between">
+
+        <div>
+
+          <h1 className="text-2xl font-bold text-slate-800">
+            Admin Dashboard
+          </h1>
+
+          <p className="text-slate-500 text-sm mt-1">
+            MediFind BD System Overview ·{" "}
+            {new Date().toLocaleDateString()}
+          </p>
+
+        </div>
+
+        <button
+          onClick={loadDashboard}
+          className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-50"
+        >
+          Refresh
+        </button>
+
       </div>
+
+      {/* ========================================
+          STAT CARDS
+      ======================================== */}
 
       <div className="grid grid-cols-4 gap-5">
-        <StatCard icon={Users} label="Total Users" value="12,480" sub="+248 this week" color="bg-blue-500" />
-        <StatCard icon={Building2} label="Pharmacies" value="86" sub="3 pending approval" color="bg-green-500" />
-        <StatCard icon={Pill} label="Medicines" value="1,240" sub="in master list" color="bg-amber-500" />
-        <StatCard icon={ShoppingBag} label="Total Reservations" value="8,340" sub="this month" color="bg-purple-500" />
+
+        <StatCard
+          icon={Users}
+          label="Total Users"
+          value={String(totalUsers)}
+          sub="registered users"
+          color="bg-blue-500"
+        />
+
+        <StatCard
+          icon={Building2}
+          label="Pharmacies"
+          value={String(approvedPharmacies)}
+          sub={`${pendingPharmacies} pending approval`}
+          color="bg-green-500"
+        />
+
+        <StatCard
+          icon={Pill}
+          label="Medicines"
+          value={String(totalMedicines)}
+          sub="in master list"
+          color="bg-amber-500"
+        />
+
+        <StatCard
+          icon={ShoppingBag}
+          label="Reservations"
+          value={String(totalReservations)}
+          sub={`${todayReservations} today`}
+          color="bg-purple-500"
+        />
+
       </div>
+
+      {/* ========================================
+          QUICK STATISTICS
+      ======================================== */}
 
       <div className="grid grid-cols-3 gap-5">
-        {/* User growth chart */}
-        <div className="col-span-2 bg-white rounded-2xl p-5 shadow-sm border border-black/5">
-          <h3 className="font-bold text-slate-800 mb-4">Platform Growth</h3>
-          <ResponsiveContainer width="100%" height={200}>
-            <LineChart data={[
-              { month: "Jan", users: 4200, pharmacies: 52 },
-              { month: "Feb", users: 5800, pharmacies: 58 },
-              { month: "Mar", users: 7200, pharmacies: 63 },
-              { month: "Apr", users: 8900, pharmacies: 70 },
-              { month: "May", users: 10400, pharmacies: 78 },
-              { month: "Jun", users: 12480, pharmacies: 86 },
-            ]}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-              <XAxis dataKey="month" tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
-              <Tooltip contentStyle={{ borderRadius: 12, border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }} />
-              <Line type="monotone" dataKey="users" stroke="#2563eb" strokeWidth={2.5} dot={false} name="Users" />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
 
-        {/* Category distribution */}
+        {/* APPROVED */}
+
         <div className="bg-white rounded-2xl p-5 shadow-sm border border-black/5">
-          <h3 className="font-bold text-slate-800 mb-4">Medicine Categories</h3>
-          <ResponsiveContainer width="100%" height={200}>
-            <PieChart>
-              <Pie data={categoryData} cx="50%" cy="50%" innerRadius={50} outerRadius={80} dataKey="value" paddingAngle={3}>
-                {categoryData.map((entry, index) => (
-                  <Cell key={index} fill={entry.color} />
-                ))}
-              </Pie>
-              <Tooltip contentStyle={{ borderRadius: 12, border: "none" }} />
-            </PieChart>
-          </ResponsiveContainer>
-          <div className="space-y-1">
-            {categoryData.map(c => (
-              <div key={c.name} className="flex items-center justify-between text-xs">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full" style={{ background: c.color }} />
-                  <span className="text-slate-600">{c.name}</span>
-                </div>
-                <span className="font-semibold text-slate-800">{c.value}%</span>
-              </div>
-            ))}
+
+          <div className="flex items-center gap-3">
+
+            <div className="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center">
+
+              <CheckCircle
+                size={20}
+                className="text-green-600"
+              />
+
+            </div>
+
+            <div>
+
+              <p className="text-xs text-slate-400">
+                Approved Pharmacies
+              </p>
+
+              <p className="text-xl font-bold text-slate-800">
+                {approvedPharmacies}
+              </p>
+
+            </div>
+
           </div>
+
         </div>
+
+        {/* PENDING */}
+
+        <div className="bg-white rounded-2xl p-5 shadow-sm border border-black/5">
+
+          <div className="flex items-center gap-3">
+
+            <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center">
+
+              <AlertTriangle
+                size={20}
+                className="text-amber-600"
+              />
+
+            </div>
+
+            <div>
+
+              <p className="text-xs text-slate-400">
+                Pending Pharmacies
+              </p>
+
+              <p className="text-xl font-bold text-slate-800">
+                {pendingPharmacies}
+              </p>
+
+            </div>
+
+          </div>
+
+        </div>
+
+        {/* RESERVATIONS */}
+
+        <div className="bg-white rounded-2xl p-5 shadow-sm border border-black/5">
+
+          <div className="flex items-center gap-3">
+
+            <div className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center">
+
+              <ShoppingBag
+                size={20}
+                className="text-purple-600"
+              />
+
+            </div>
+
+            <div>
+
+              <p className="text-xs text-slate-400">
+                Pending Reservations
+              </p>
+
+              <p className="text-xl font-bold text-slate-800">
+                {pendingReservations}
+              </p>
+
+            </div>
+
+          </div>
+
+        </div>
+
       </div>
 
-      {/* Pending pharmacies */}
-      <div className="bg-white rounded-2xl shadow-sm border border-black/5 overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-          <h3 className="font-bold text-slate-800">Pending Pharmacy Approvals</h3>
-          <button onClick={() => setPage("admin-pharmacy-approval")} className="text-xs text-blue-600 font-semibold hover:underline">View All</button>
+      {/* ========================================
+          PHARMACY STATUS
+      ======================================== */}
+
+      <div className="grid grid-cols-2 gap-5">
+
+        {/* PHARMACY STATUS */}
+
+        <div className="bg-white rounded-2xl p-5 shadow-sm border border-black/5">
+
+          <div className="flex items-center justify-between mb-5">
+
+            <h3 className="font-bold text-slate-800">
+              Pharmacy Status
+            </h3>
+
+            <button
+              onClick={() =>
+                setPage(
+                  "admin-pharmacy-approval"
+                )
+              }
+              className="text-xs text-blue-600 font-semibold hover:underline"
+            >
+              Manage
+            </button>
+
+          </div>
+
+          <div className="space-y-4">
+
+            {/* APPROVED */}
+
+            <div>
+
+              <div className="flex justify-between text-sm mb-1">
+
+                <span className="text-slate-600">
+                  Approved
+                </span>
+
+                <span className="font-semibold text-green-600">
+                  {approvedPharmacies}
+                </span>
+
+              </div>
+
+              <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+
+                <div
+                  className="h-full bg-green-500 rounded-full"
+                  style={{
+                    width:
+                      totalPharmacies > 0
+                        ? `${(
+                            approvedPharmacies /
+                            totalPharmacies
+                          ) * 100}%`
+                        : "0%"
+                  }}
+                />
+
+              </div>
+
+            </div>
+
+            {/* PENDING */}
+
+            <div>
+
+              <div className="flex justify-between text-sm mb-1">
+
+                <span className="text-slate-600">
+                  Pending
+                </span>
+
+                <span className="font-semibold text-amber-600">
+                  {pendingPharmacies}
+                </span>
+
+              </div>
+
+              <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+
+                <div
+                  className="h-full bg-amber-500 rounded-full"
+                  style={{
+                    width:
+                      totalPharmacies > 0
+                        ? `${(
+                            pendingPharmacies /
+                            totalPharmacies
+                          ) * 100}%`
+                        : "0%"
+                  }}
+                />
+
+              </div>
+
+            </div>
+
+            {/* REJECTED */}
+
+            <div>
+
+              <div className="flex justify-between text-sm mb-1">
+
+                <span className="text-slate-600">
+                  Rejected
+                </span>
+
+                <span className="font-semibold text-red-600">
+                  {rejectedPharmacies}
+                </span>
+
+              </div>
+
+              <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+
+                <div
+                  className="h-full bg-red-400 rounded-full"
+                  style={{
+                    width:
+                      totalPharmacies > 0
+                        ? `${(
+                            rejectedPharmacies /
+                            totalPharmacies
+                          ) * 100}%`
+                        : "0%"
+                  }}
+                />
+
+              </div>
+
+            </div>
+
+          </div>
+
         </div>
-        <table className="w-full">
-          <thead className="bg-slate-50 border-b border-slate-100">
-            <tr>
-              {["Pharmacy", "Owner", "Area", "Applied", "License", "Actions"].map(h => (
-                <th key={h} className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-50">
-            {PENDING_PHARMACIES.map(ph => (
-              <tr key={ph.id} className="hover:bg-slate-50/50 transition-colors">
-                <td className="px-6 py-4 text-sm font-semibold text-slate-800">{ph.name}</td>
-                <td className="px-6 py-4 text-sm text-slate-500">{ph.owner}</td>
-                <td className="px-6 py-4 text-sm text-slate-500">{ph.area}</td>
-                <td className="px-6 py-4 text-sm text-slate-400">{ph.applied}</td>
-                <td className="px-6 py-4 text-xs font-mono text-slate-500">{ph.license}</td>
-                <td className="px-6 py-4">
-                  <div className="flex gap-2">
-                    <button className="px-3 py-1.5 bg-green-600 text-white text-xs rounded-lg font-semibold hover:bg-green-700 flex items-center gap-1">
-                      <CheckCircle size={12} />Approve
-                    </button>
-                    <button className="px-3 py-1.5 bg-red-100 text-red-600 text-xs rounded-lg font-semibold hover:bg-red-200 flex items-center gap-1">
-                      <XCircle size={12} />Reject
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+
+        {/* PLATFORM SUMMARY */}
+
+        <div className="bg-white rounded-2xl p-5 shadow-sm border border-black/5">
+
+          <h3 className="font-bold text-slate-800 mb-5">
+            Platform Summary
+          </h3>
+
+          <div className="grid grid-cols-2 gap-4">
+
+            <div className="p-4 bg-blue-50 rounded-xl">
+
+              <p className="text-xs text-blue-500">
+                Users
+              </p>
+
+              <p className="text-2xl font-bold text-blue-700 mt-1">
+                {totalUsers}
+              </p>
+
+            </div>
+
+            <div className="p-4 bg-amber-50 rounded-xl">
+
+              <p className="text-xs text-amber-500">
+                Medicines
+              </p>
+
+              <p className="text-2xl font-bold text-amber-700 mt-1">
+                {totalMedicines}
+              </p>
+
+            </div>
+
+            <div className="p-4 bg-green-50 rounded-xl">
+
+              <p className="text-xs text-green-500">
+                Pharmacies
+              </p>
+
+              <p className="text-2xl font-bold text-green-700 mt-1">
+                {approvedPharmacies}
+              </p>
+
+            </div>
+
+            <div className="p-4 bg-purple-50 rounded-xl">
+
+              <p className="text-xs text-purple-500">
+                Reservations
+              </p>
+
+              <p className="text-2xl font-bold text-purple-700 mt-1">
+                {totalReservations}
+              </p>
+
+            </div>
+
+          </div>
+
+        </div>
+
       </div>
+
+      {/* ========================================
+          PENDING PHARMACY APPROVALS
+      ======================================== */}
+
+      <div className="bg-white rounded-2xl shadow-sm border border-black/5 overflow-hidden">
+
+        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+
+          <div>
+
+            <h3 className="font-bold text-slate-800">
+              Pending Pharmacy Approvals
+            </h3>
+
+            <p className="text-xs text-slate-400 mt-1">
+
+              {pendingPharmacies} pharmacy
+              {pendingPharmacies !== 1
+                ? "s"
+                : ""}{" "}
+              waiting for review
+
+            </p>
+
+          </div>
+
+          <button
+            onClick={() =>
+              setPage(
+                "admin-pharmacy-approval"
+              )
+            }
+            className="text-xs text-blue-600 font-semibold hover:underline"
+          >
+            View All
+          </button>
+
+        </div>
+
+        {pendingPharmacyList.length === 0 ? (
+
+          <div className="p-10 text-center">
+
+            <CheckCircle
+              size={36}
+              className="mx-auto text-green-300 mb-3"
+            />
+
+            <p className="text-sm text-slate-500">
+              No pending pharmacy approvals
+            </p>
+
+          </div>
+
+        ) : (
+
+          <table className="w-full">
+
+            <thead className="bg-slate-50 border-b border-slate-100">
+
+              <tr>
+
+                {[
+                  "Pharmacy",
+                  "Owner",
+                  "Address",
+                  "Applied",
+                  "Status",
+                  "Actions"
+                ].map(h => (
+
+                  <th
+                    key={h}
+                    className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide"
+                  >
+                    {h}
+                  </th>
+
+                ))}
+
+              </tr>
+
+            </thead>
+
+            <tbody className="divide-y divide-slate-50">
+
+              {pendingPharmacyList.map(
+                (ph: any) => (
+
+                  <tr
+                    key={ph.id}
+                    className="hover:bg-slate-50/50 transition-colors"
+                  >
+
+                    <td className="px-6 py-4">
+
+                      <p className="text-sm font-semibold text-slate-800">
+                        {ph.pharmacy_name}
+                      </p>
+
+                      <p className="text-xs text-slate-400">
+                        ID #{ph.id}
+                      </p>
+
+                    </td>
+
+                    <td className="px-6 py-4 text-sm text-slate-500">
+                      {ph.owner_name || "—"}
+                    </td>
+
+                    <td className="px-6 py-4 text-sm text-slate-500">
+                      {ph.address || "—"}
+                    </td>
+
+                    <td className="px-6 py-4 text-sm text-slate-400">
+
+                      {ph.created_at
+                        ? new Date(
+                            ph.created_at
+                          ).toLocaleDateString()
+                        : "—"}
+
+                    </td>
+
+                    <td className="px-6 py-4">
+
+                      <Badge
+                        label="Pending"
+                        variant="yellow"
+                      />
+
+                    </td>
+
+                    <td className="px-6 py-4">
+
+                      <button
+                        onClick={() =>
+                          setPage(
+                            "admin-pharmacy-approval"
+                          )
+                        }
+                        className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded-lg font-semibold hover:bg-blue-700"
+                      >
+                        Review
+                      </button>
+
+                    </td>
+
+                  </tr>
+
+                )
+              )}
+
+            </tbody>
+
+          </table>
+
+        )}
+
+      </div>
+
+      {/* ========================================
+          FOOTER
+      ======================================== */}
+
+      <div className="flex justify-end">
+
+        <button
+          onClick={loadDashboard}
+          className="px-4 py-2 border border-slate-200 bg-white rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-50"
+        >
+          Refresh Dashboard
+        </button>
+
+      </div>
+
     </div>
   );
 }
+
 function AdminPharmacyApproval() {
   const [pharmacies, setPharmacies] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
