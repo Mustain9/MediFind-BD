@@ -1,3 +1,4 @@
+import PharmacyLocationPicker from "./components/PharmacyLocationPicker";
 import {
   MapContainer,
   TileLayer,
@@ -11,6 +12,8 @@ import "leaflet/dist/leaflet.css";
 
 import { useState, useEffect } from "react";
 import api from "./api";
+import GoogleMap from "./components/GoogleMap";
+
 import {
   Search, MapPin, Bell, ChevronDown, Menu, X, Home, Pill, Building2,
   Users, BarChart3, Settings, LogOut, Star, Phone, Clock, Navigation,
@@ -3443,93 +3446,76 @@ function PriceComparisonPage({ setPage }: { setPage: (p: Page) => void }) {
 }
 
 function PharmacyLocatorPage() {
-
     const [selected, setSelected] = useState<number | null>(null);
-
     const [pharmacies, setPharmacies] = useState<any[]>([]);
-
     const [loading, setLoading] = useState(true);
-
     const [error, setError] = useState("");
-
 
     // ==========================================
     // LOAD APPROVED PHARMACIES
     // ==========================================
 
     const loadPharmacies = async () => {
-
         try {
-
             setLoading(true);
-
             setError("");
 
-            const response = await api.get(
-                "/pharmacies"
-            );
+            const response = await api.get("/pharmacies");
 
             console.log(
-                "Pharmacy response:",
+                "PHARMACY RESPONSE:",
                 response.data
             );
 
+            if (response.data?.success) {
+                const pharmacyList =
+                    response.data.pharmacies || [];
 
-            if (response.data.success) {
-
-                setPharmacies(
-                    response.data.pharmacies || []
+                console.log(
+                    "PHARMACIES FROM DATABASE:",
+                    pharmacyList
                 );
 
+                setPharmacies(pharmacyList);
             } else {
-
                 setPharmacies([]);
 
                 setError(
-                    response.data.message ||
-                    "Failed to load pharmacies."
+                    response.data?.message ||
+                    "No pharmacies found."
                 );
             }
-
         } catch (error: any) {
-
             console.error(
-                "Failed to load pharmacies:",
+                "FAILED TO LOAD PHARMACIES:",
                 error.response?.data || error
-            );
-
-            setError(
-                error.response?.data?.message ||
-                "Failed to connect to the server."
             );
 
             setPharmacies([]);
 
+            setError(
+                error.response?.data?.message ||
+                error.message ||
+                "Failed to connect to the server."
+            );
         } finally {
-
             setLoading(false);
-
         }
     };
-
 
     // ==========================================
     // LOAD ON PAGE OPEN
     // ==========================================
 
     useEffect(() => {
-
         loadPharmacies();
-
     }, []);
-
 
     // ==========================================
     // GET OPENING HOURS
     // ==========================================
 
     const getHours = (ph: any) => {
-
         if (
             !ph.opening_time &&
             !ph.closing_time
@@ -3555,18 +3541,17 @@ function PharmacyLocatorPage() {
         return `${opening} - ${closing}`;
     };
 
-
     // ==========================================
     // GET DIRECTIONS
     // ==========================================
 
     const getDirections = (ph: any) => {
-
         if (
-            ph.latitude &&
-            ph.longitude
+            ph.latitude !== null &&
+            ph.latitude !== undefined &&
+            ph.longitude !== null &&
+            ph.longitude !== undefined
         ) {
-
             const url =
                 `https://www.google.com/maps/dir/?api=1&destination=${ph.latitude},${ph.longitude}`;
 
@@ -3578,13 +3563,12 @@ function PharmacyLocatorPage() {
             return;
         }
 
-
         // Fallback using address
-
         if (ph.address) {
-
             const url =
-                `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(ph.address)}`;
+                `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                    ph.address
+                )}`;
 
             window.open(
                 url,
@@ -3594,36 +3578,32 @@ function PharmacyLocatorPage() {
             return;
         }
 
-
         alert(
             "Location information is not available for this pharmacy."
         );
     };
-
 
     // ==========================================
     // LOADING
     // ==========================================
 
     if (loading) {
-
         return (
             <div className="p-6">
-
                 <div className="bg-white rounded-2xl p-12 text-center shadow-sm border border-black/5">
-
                     <div className="w-10 h-10 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin mx-auto mb-4" />
 
                     <p className="text-sm text-slate-500">
                         Loading pharmacies...
                     </p>
-
                 </div>
-
             </div>
         );
     }
 
+    // ==========================================
+    // MAIN PAGE
+    // ==========================================
 
     return (
         <div className="p-6 space-y-5">
@@ -3633,7 +3613,6 @@ function PharmacyLocatorPage() {
             ========================================== */}
 
             <div>
-
                 <h1 className="text-2xl font-bold text-slate-800">
                     Pharmacy Locator
                 </h1>
@@ -3641,7 +3620,6 @@ function PharmacyLocatorPage() {
                 <p className="text-slate-500 text-sm mt-1">
                     Find verified pharmacies near your location
                 </p>
-
             </div>
 
 
@@ -3650,9 +3628,7 @@ function PharmacyLocatorPage() {
             ========================================== */}
 
             {error && (
-
                 <div className="bg-red-50 border border-red-200 rounded-xl p-4">
-
                     <p className="text-sm font-semibold text-red-700">
                         {error}
                     </p>
@@ -3663,19 +3639,24 @@ function PharmacyLocatorPage() {
                     >
                         Try Again
                     </button>
-
                 </div>
-
             )}
 
 
             {/* ==========================================
-                MAIN
+                MAIN CONTENT
             ========================================== */}
 
             <div
-                className="grid grid-cols-3 gap-5"
-                style={{ height: 580 }}
+                className="
+                    grid
+                    grid-cols-1
+                    lg:grid-cols-12
+                    gap-5
+                "
+                style={{
+                    height: "650px"
+                }}
             >
 
                 {/* ==========================================
@@ -3683,7 +3664,12 @@ function PharmacyLocatorPage() {
                 ========================================== */}
 
                 <div
-                    className="space-y-3 overflow-y-auto pr-2"
+                    className="
+                        lg:col-span-4
+                        space-y-3
+                        overflow-y-auto
+                        pr-2
+                    "
                     style={{
                         scrollbarWidth: "thin"
                     }}
@@ -3715,9 +3701,7 @@ function PharmacyLocatorPage() {
                             const isSelected =
                                 selected === pharmacy.id;
 
-
                             return (
-
                                 <div
                                     key={pharmacy.id}
                                     onClick={() =>
@@ -3725,23 +3709,29 @@ function PharmacyLocatorPage() {
                                             pharmacy.id
                                         )
                                     }
-                                    className={`p-4 rounded-2xl cursor-pointer transition-all border ${
-                                        isSelected
-                                            ? "border-blue-400 bg-blue-50"
-                                            : "border-black/5 bg-white hover:shadow-sm"
-                                    }`}
+                                    className={`
+                                        p-4
+                                        rounded-2xl
+                                        cursor-pointer
+                                        transition-all
+                                        border
+                                        ${
+                                            isSelected
+                                                ? "border-blue-400 bg-blue-50"
+                                                : "border-black/5 bg-white hover:shadow-sm"
+                                        }
+                                    `}
                                 >
 
-                                    {/* Pharmacy name */}
+                                    {/* ==========================================
+                                        PHARMACY NAME
+                                    ========================================== */}
 
                                     <div className="flex items-start justify-between mb-2">
 
                                         <h3 className="font-bold text-slate-800 text-sm">
-
                                             {pharmacy.pharmacy_name}
-
                                         </h3>
-
 
                                         <div className="flex items-center gap-1 text-green-600 text-xs font-semibold">
 
@@ -3756,7 +3746,9 @@ function PharmacyLocatorPage() {
                                     </div>
 
 
-                                    {/* Address */}
+                                    {/* ==========================================
+                                        ADDRESS
+                                    ========================================== */}
 
                                     <p className="text-xs text-slate-400 flex items-start gap-1 mb-2">
 
@@ -3773,9 +3765,13 @@ function PharmacyLocatorPage() {
                                     </p>
 
 
-                                    {/* Details */}
+                                    {/* ==========================================
+                                        PHARMACY DETAILS
+                                    ========================================== */}
 
                                     <div className="grid grid-cols-2 gap-2 text-xs text-slate-500">
+
+                                        {/* Hours */}
 
                                         <span className="flex items-center gap-1">
 
@@ -3789,6 +3785,8 @@ function PharmacyLocatorPage() {
                                         </span>
 
 
+                                        {/* Phone */}
+
                                         <span className="flex items-center gap-1">
 
                                             <Phone
@@ -3801,6 +3799,8 @@ function PharmacyLocatorPage() {
 
                                         </span>
 
+
+                                        {/* Medicines */}
 
                                         <span className="flex items-center gap-1">
 
@@ -3816,6 +3816,8 @@ function PharmacyLocatorPage() {
                                         </span>
 
 
+                                        {/* Location */}
+
                                         <span className="flex items-center gap-1">
 
                                             <MapPin
@@ -3823,8 +3825,10 @@ function PharmacyLocatorPage() {
                                                 className="text-blue-400"
                                             />
 
-                                            {pharmacy.latitude &&
-                                            pharmacy.longitude
+                                            {pharmacy.latitude !== null &&
+                                            pharmacy.latitude !== undefined &&
+                                            pharmacy.longitude !== null &&
+                                            pharmacy.longitude !== undefined
                                                 ? "Location available"
                                                 : "Location unavailable"}
 
@@ -3833,7 +3837,9 @@ function PharmacyLocatorPage() {
                                     </div>
 
 
-                                    {/* Directions */}
+                                    {/* ==========================================
+                                        DIRECTIONS BUTTON
+                                    ========================================== */}
 
                                     <button
                                         onClick={(e) => {
@@ -3845,7 +3851,22 @@ function PharmacyLocatorPage() {
                                             );
 
                                         }}
-                                        className="mt-3 w-full py-2 text-xs font-semibold rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+                                        className="
+                                            mt-3
+                                            w-full
+                                            py-2
+                                            text-xs
+                                            font-semibold
+                                            rounded-xl
+                                            bg-blue-600
+                                            text-white
+                                            hover:bg-blue-700
+                                            transition-colors
+                                            flex
+                                            items-center
+                                            justify-center
+                                            gap-2
+                                        "
                                     >
 
                                         <Navigation
@@ -3857,114 +3878,36 @@ function PharmacyLocatorPage() {
                                     </button>
 
                                 </div>
-
                             );
-
                         })
-
                     )}
 
                 </div>
-                    {/* ==========================================
-                        REAL INTERACTIVE MAP
-                    ========================================== */}
 
-                    <div className="col-span-2 bg-slate-200 rounded-2xl overflow-hidden relative">
 
-                      <MapContainer
-                        center={[23.8103, 90.4125]}
-                        zoom={11}
-                        scrollWheelZoom={true}
-                        className="w-full h-full"
-                        style={{ minHeight: "580px" }}
-                      >
+                {/* ==========================================
+                    MAP
+                ========================================== */}
 
-                        <TileLayer
-                          attribution="&copy; OpenStreetMap contributors"
-                          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                        />
+                <div
+                    className="
+                        lg:col-span-8
+                        h-full
+                        min-h-[500px]
+                        bg-white
+                        rounded-2xl
+                        overflow-hidden
+                        border
+                        border-black/5
+                        shadow-sm
+                    "
+                >
 
-                        <MapCenter
-                          pharmacy={
-                            selected
-                              ? pharmacies.find(
-                                  (p) => p.id === selected
-                                ) || null
-                              : null
-                          }
-                        />
+                    <GoogleMap
+                        pharmacies={pharmacies}
+                    />
 
-                        {pharmacies.map((pharmacy) => {
-
-                          const latitude =
-                            Number(pharmacy.latitude);
-
-                          const longitude =
-                            Number(pharmacy.longitude);
-
-                          if (
-                            !Number.isFinite(latitude) ||
-                            !Number.isFinite(longitude)
-                          ) {
-                            return null;
-                          }
-
-                          return (
-                            <Marker
-                              key={pharmacy.id}
-                              position={[
-                                latitude,
-                                longitude
-                              ]}
-                              icon={pharmacyIcon}
-                              eventHandlers={{
-                                click: () =>
-                                  setSelected(pharmacy.id)
-                              }}
-                            >
-
-                              <Popup>
-
-                                <div className="min-w-[220px]">
-
-                                  <h3 className="font-bold text-slate-800 text-sm">
-                                    {pharmacy.pharmacy_name}
-                                  </h3>
-
-                                  <p className="text-xs text-slate-500 mt-1">
-                                    {pharmacy.address ||
-                                      "Address unavailable"}
-                                  </p>
-
-                                  <p className="text-xs text-slate-500 mt-2">
-                                    📞 {pharmacy.phone ||
-                                      "No phone"}
-                                  </p>
-
-                                  <p className="text-xs text-green-600 font-semibold mt-1">
-                                    ✓ Verified Pharmacy
-                                  </p>
-
-                                  <button
-                                    onClick={() =>
-                                      getDirections(pharmacy)
-                                    }
-                                    className="mt-3 w-full px-3 py-2 bg-blue-600 text-white rounded-lg text-xs font-semibold hover:bg-blue-700"
-                                  >
-                                    Get Directions
-                                  </button>
-
-                                </div>
-
-                              </Popup>
-
-                            </Marker>
-                          );
-                        })}
-
-                      </MapContainer>
-
-                    </div>
+                </div>
 
             </div>
 
@@ -4700,6 +4643,7 @@ function PharmacyInventory() {
             const response = await api.get("/medicines");
 
             console.log("Medicines response:", response.data);
+            console.log("Medicine count:", response.data.length);
 
             if (Array.isArray(response.data)) {
 
@@ -5995,6 +5939,8 @@ function PharmacyProfile() {
         phone: "",
         email: "",
         address: "",
+        latitude: null as number | null,
+        longitude: null as number | null,
         opening_time: "",
         closing_time: ""
     });
@@ -6024,15 +5970,28 @@ function PharmacyProfile() {
 
                 setPharmacy(data);
 
-                setForm({
-                    pharmacy_name: data.pharmacy_name || "",
-                    owner_name: data.owner_name || "",
-                    phone: data.phone || "",
-                    email: data.email || "",
-                    address: data.address || "",
-                    opening_time: data.opening_time || "",
-                    closing_time: data.closing_time || ""
-                });
+         setForm({
+                pharmacy_name: data.pharmacy_name || "",
+                owner_name: data.owner_name || "",
+                phone: data.phone || "",
+                email: data.email || "",
+                address: data.address || "",
+
+                latitude:
+                    data.latitude !== null &&
+                    data.latitude !== undefined
+                        ? Number(data.latitude)
+                        : null,
+
+                longitude:
+                    data.longitude !== null &&
+                    data.longitude !== undefined
+                        ? Number(data.longitude)
+                        : null,
+
+                opening_time: data.opening_time || "",
+                closing_time: data.closing_time || ""
+            });
             }
 
         } catch (error: any) {
@@ -6120,15 +6079,19 @@ function PharmacyProfile() {
             const response = await api.put(
                 `/pharmacies/${pharmacy.id}`,
                 {
-                    pharmacy_name: form.pharmacy_name,
-                    owner_name: form.owner_name,
-                    phone: form.phone,
-                    email: form.email,
-                    address: form.address,
-                    opening_time: form.opening_time || null,
-                    closing_time: form.closing_time || null
+                  pharmacy_name: form.pharmacy_name,
+                  owner_name: form.owner_name,
+                  phone: form.phone,
+                  email: form.email,
+                  address: form.address,
+
+                  latitude: form.latitude,
+                  longitude: form.longitude,
+
+                  opening_time: form.opening_time || null,
+                  closing_time: form.closing_time || null
                 }
-            );
+                );
 
 
             if (response.data.success) {
@@ -6396,6 +6359,31 @@ function PharmacyProfile() {
                         />
 
                     </div>
+
+                    {/* ==========================================
+                                  STORE LOCATION
+                        ========================================== */}
+
+                      <div className="col-span-2">
+
+                            <PharmacyLocationPicker
+                                latitude={form.latitude}
+                                longitude={form.longitude}
+                                onLocationChange={(
+                                    latitude,
+                                    longitude
+                                ) => {
+
+                                    setForm((prev) => ({
+                                        ...prev,
+                                        latitude,
+                                        longitude
+                                    }));
+
+                                }}
+                            />
+
+                        </div>
 
 
                     {/* Opening Time */}
@@ -8515,19 +8503,29 @@ function AdminMedicineManagement() {
     totalGenerics: 0
 });
 
-  const loadMedicines = async () => {
-    try {
-      const response = await fetch("http://localhost:5000/api/medicines");
-      const data = await response.json();
+const loadMedicines = async () => {
+  try {
+    const response = await api.get("/medicines");
 
-      if (data.success) {
-        setStats(data.statistics);
-      }
-    } catch (err) {
-      console.log(err);
+    console.log("Medicines response:", response.data);
+
+    if (Array.isArray(response.data)) {
+      setMedicines(response.data);
+    } else if (Array.isArray(response.data.medicines)) {
+      setMedicines(response.data.medicines);
+    } else {
+      setMedicines([]);
     }
-  };
 
+  } catch (error: any) {
+    console.error(
+      "Failed to load medicines:",
+      error.response?.data || error
+    );
+
+    setMedicines([]);
+  }
+};
   const loadStats = async () => {
 
     try {
@@ -8719,465 +8717,913 @@ const deleteMedicine = async (id: number) => {
       }, []);
 
   return (
-    <div className="p-6 space-y-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800">Medicine Master List</h1>
-          <p className="text-slate-500 text-sm mt-1">Manage the global medicine database</p>
-        </div>
-        <button
-          onClick={()=>setShowAddModal(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700"
-      >
-          <Plus size={16} />Add Medicine
-        </button>
-      </div>
+  <div className="p-6 space-y-5">
 
-      <div className="grid grid-cols-4 gap-4">
-        {[["All Medicines", stats.totalMedicines, "bg-blue-500"],
-          ["Categories", stats.totalCategories, "bg-green-500"],
-          ["Manufacturers", stats.totalManufacturers, "bg-amber-500"],
-          ["Generics", stats.totalGenerics, "bg-purple-500"]].map(([l, v, c]) => (
-          <div key={l} className={`${c} rounded-2xl p-5 text-white`}>
-            <p className="text-3xl font-bold">{v}</p>
-            <p className="text-sm opacity-80 mt-1">{l}</p>
-          </div>
-        ))}
-      </div>
-
-      <div className="bg-white rounded-2xl shadow-sm border border-black/5 overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-100 flex gap-4">
-          <div className="flex-1 flex items-center gap-3 px-4 py-2.5 rounded-xl border border-slate-200">
-            <Search size={16} className="text-slate-400" />
-            <input
-              value={search}
-              onChange={(e)=>setSearch(e.target.value)}
-              className="flex-1 outline-none text-sm text-slate-700"
-              placeholder="Search medicine..."
-          />
-          </div>
-          <select className="px-4 py-2.5 rounded-xl border border-slate-200 text-sm bg-white">
-            <option>All Categories</option>
-            <option>Analgesic</option>
-            <option>Antibiotic</option>
-          </select>
-          <select className="px-4 py-2.5 rounded-xl border border-slate-200 text-sm bg-white">
-            <option>All Manufacturers</option>
-            <option>Beximco Pharma</option>
-            <option>Square Pharma</option>
-          </select>
-        </div>
-        <table className="w-full">
-          <thead className="bg-slate-50 border-b border-slate-100">
-            <tr>
-              {["Medicine", "Generic", "Manufacturer", "Category", "Strength", "Actions"].map(h => (
-                <th key={h} className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-50">
-            {medicines
-                .filter(m =>
-                  (m.brand_name || "")
-                    .toLowerCase()
-                    .includes(search.toLowerCase()) ||
-                  (m.generic_name || "")
-                    .toLowerCase()
-                    .includes(search.toLowerCase())
-                )
-              .map(m => (
-              <tr key={m.id} className="hover:bg-slate-50/50 transition-colors">
-                <td className="px-6 py-4 text-sm font-semibold text-slate-800">{m.brand_name}</td>
-                <td className="px-6 py-4 text-sm text-slate-500">{m.generic_name}</td>
-                <td className="px-6 py-4 text-sm text-slate-500">{m.manufacturer}</td>
-                <td className="px-6 py-4"><Badge label={m.category} variant="blue" /></td>
-                <td className="px-6 py-4 text-sm text-slate-500">{m.strength}</td>
-                <td className="px-6 py-4">
-                  <div className="flex gap-2">
-                    <button
-                          onClick={() => {
-
-                              setEditingId(m.id);
-
-                              setNewMedicine({
-                                  brand_name: m.brand_name,
-                                  generic_name: m.generic_name,
-                                  manufacturer: m.manufacturer,
-                                  category: m.category,
-                                  strength: m.strength,
-                                  description: m.description || ""
-                              });
-
-                              setShowEditModal(true);
-
-                          }}
-                          className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600"
-                      >
-                          <Edit2 size={14} />
-                      </button>
-                      <button
-                            onClick={() => deleteMedicine(m.id)}
-                            className="p-2 rounded-lg border border-red-200 text-red-600 hover:bg-red-50"
-                        >
-                            <Trash2 size={14} />
-                        </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-{showAddModal && (
-  <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-
-    <div className="bg-white rounded-2xl w-full max-w-[500px] p-6 space-y-4">
-
-      {/* HEADER */}
+    {/* ==========================================
+        HEADER
+    ========================================== */}
+    <div className="flex items-center justify-between">
       <div>
-        <h2 className="text-xl font-bold text-slate-800">
-          Add Medicine
-        </h2>
+        <h1 className="text-2xl font-bold text-slate-800">
+          Medicine Master List
+        </h1>
 
-        <p className="text-sm text-slate-400 mt-1">
-          Add a new medicine to the master database
+        <p className="text-slate-500 text-sm mt-1">
+          Manage the global medicine database
         </p>
       </div>
 
-
-      {/* BRAND NAME */}
-      <div>
-        <label className="block text-sm font-semibold text-slate-600 mb-2">
-          Brand Name
-        </label>
-
-        <input
-          type="text"
-          placeholder="Enter brand name"
-          value={newMedicine.brand_name}
-          onChange={(e) =>
-            setNewMedicine({
-              ...newMedicine,
-              brand_name: e.target.value
-            })
-          }
-          className="w-full border border-slate-200 rounded-xl p-3 outline-none focus:border-blue-400"
-        />
-      </div>
+      <button
+        onClick={() => setShowAddModal(true)}
+        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700"
+      >
+        <Plus size={16} />
+        Add Medicine
+      </button>
+    </div>
 
 
-      {/* GENERIC NAME */}
-      <div>
-        <label className="block text-sm font-semibold text-slate-600 mb-2">
-          Generic Name
-        </label>
+    {/* ==========================================
+        STATISTICS
+    ========================================== */}
+    <div className="grid grid-cols-4 gap-4">
 
-        <input
-          type="text"
-          placeholder="Enter generic name"
-          value={newMedicine.generic_name}
-          onChange={(e) =>
-            setNewMedicine({
-              ...newMedicine,
-              generic_name: e.target.value
-            })
-          }
-          className="w-full border border-slate-200 rounded-xl p-3 outline-none focus:border-blue-400"
-        />
-      </div>
+      {[
+        ["All Medicines", stats.totalMedicines, "bg-blue-500"],
+        ["Categories", stats.totalCategories, "bg-green-500"],
+        ["Manufacturers", stats.totalManufacturers, "bg-amber-500"],
+        ["Generics", stats.totalGenerics, "bg-purple-500"],
+      ].map(([label, value, color]) => (
+
+        <div
+          key={String(label)}
+          className={`${color} rounded-2xl p-5 text-white`}
+        >
+          <p className="text-3xl font-bold">
+            {value}
+          </p>
+
+          <p className="text-sm opacity-80 mt-1">
+            {label}
+          </p>
+        </div>
+
+      ))}
+
+    </div>
 
 
-      {/* MANUFACTURER */}
-      <div>
-        <label className="block text-sm font-semibold text-slate-600 mb-2">
-          Manufacturer
-        </label>
+    {/* ==========================================
+        MEDICINE TABLE
+    ========================================== */}
+    <div className="bg-white rounded-2xl shadow-sm border border-black/5 overflow-hidden">
 
+      {/* SEARCH + FILTERS */}
+      <div className="px-6 py-4 border-b border-slate-100 flex gap-4">
+
+        {/* SEARCH */}
+        <div className="flex-1 flex items-center gap-3 px-4 py-2.5 rounded-xl border border-slate-200">
+
+          <Search
+            size={16}
+            className="text-slate-400"
+          />
+
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="flex-1 outline-none text-sm text-slate-700"
+            placeholder="Search medicine..."
+          />
+
+        </div>
+
+
+        {/* CATEGORY FILTER */}
         <select
-          value={newMedicine.manufacturer_id}
-          onChange={(e) =>
-            setNewMedicine({
-              ...newMedicine,
-              manufacturer_id: e.target.value
-            })
-          }
-          className="w-full border border-slate-200 rounded-xl p-3 outline-none focus:border-blue-400 bg-white"
+          className="px-4 py-2.5 rounded-xl border border-slate-200 text-sm bg-white"
         >
-          <option value="">
-            Select Manufacturer
+          <option>
+            All Categories
           </option>
 
-          {manufacturers.map((manufacturer) => (
-            <option
-              key={manufacturer.id}
-              value={manufacturer.id}
-            >
-              {manufacturer.manufacturer_name}
-            </option>
-          ))}
+          <option>
+            Analgesic
+          </option>
+
+          <option>
+            Antibiotic
+          </option>
+
+          <option>
+            Diabetes
+          </option>
+
+          <option>
+            Gastric
+          </option>
+
         </select>
-      </div>
 
 
-      {/* CATEGORY */}
-      <div>
-        <label className="block text-sm font-semibold text-slate-600 mb-2">
-          Category
-        </label>
-
+        {/* MANUFACTURER FILTER */}
         <select
-          value={newMedicine.category_id}
-          onChange={(e) =>
-            setNewMedicine({
-              ...newMedicine,
-              category_id: e.target.value
-            })
-          }
-          className="w-full border border-slate-200 rounded-xl p-3 outline-none focus:border-blue-400 bg-white"
+          className="px-4 py-2.5 rounded-xl border border-slate-200 text-sm bg-white"
         >
-          <option value="">
-            Select Category
+          <option>
+            All Manufacturers
           </option>
 
-          {categories.map((category) => (
-            <option
-              key={category.id}
-              value={category.id}
-            >
-              {category.category_name}
-            </option>
-          ))}
+          <option>
+            Beximco Pharma
+          </option>
+
+          <option>
+            Square Pharma
+          </option>
+
+          <option>
+            Incepta Pharma
+          </option>
+
+          <option>
+            Renata
+          </option>
+
         </select>
+
       </div>
 
 
-      {/* STRENGTH */}
-      <div>
-        <label className="block text-sm font-semibold text-slate-600 mb-2">
-          Strength
-        </label>
+      {/* ==========================================
+          TABLE
+      ========================================== */}
+      <div className="overflow-x-auto">
 
-        <input
-          type="text"
-          placeholder="Example: 500 mg"
-          value={newMedicine.strength}
-          onChange={(e) =>
-            setNewMedicine({
-              ...newMedicine,
-              strength: e.target.value
-            })
-          }
-          className="w-full border border-slate-200 rounded-xl p-3 outline-none focus:border-blue-400"
-        />
-      </div>
+        <table className="w-full">
 
+          {/* TABLE HEADER */}
+          <thead className="bg-slate-50 border-b border-slate-100">
 
-      {/* DOSAGE FORM */}
-      <div>
-        <label className="block text-sm font-semibold text-slate-600 mb-2">
-          Dosage Form
-        </label>
+            <tr>
 
-        <select
-          value={newMedicine.dosage_form}
-          onChange={(e) =>
-            setNewMedicine({
-              ...newMedicine,
-              dosage_form: e.target.value
-            })
-          }
-          className="w-full border border-slate-200 rounded-xl p-3 outline-none focus:border-blue-400 bg-white"
-        >
-          <option value="">
-            Select Dosage Form
-          </option>
+              {[
+                "Medicine",
+                "Generic",
+                "Manufacturer",
+                "Category",
+                "Strength",
+                "Actions",
+              ].map((header) => (
 
-          <option value="Tablet">
-            Tablet
-          </option>
+                <th
+                  key={header}
+                  className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide"
+                >
+                  {header}
+                </th>
 
-          <option value="Capsule">
-            Capsule
-          </option>
+              ))}
 
-          <option value="Syrup">
-            Syrup
-          </option>
+            </tr>
 
-          <option value="Injection">
-            Injection
-          </option>
-
-          <option value="Cream">
-            Cream
-          </option>
-
-          <option value="Ointment">
-            Ointment
-          </option>
-
-          <option value="Drops">
-            Drops
-          </option>
-
-          <option value="Inhaler">
-            Inhaler
-          </option>
-        </select>
-      </div>
+          </thead>
 
 
-      {/* DESCRIPTION */}
-      <div>
-        <label className="block text-sm font-semibold text-slate-600 mb-2">
-          Description
-        </label>
+          {/* ==========================================
+              TABLE BODY
+          ========================================== */}
+          <tbody className="divide-y divide-slate-50">
 
-        <textarea
-          placeholder="Enter medicine description"
-          value={newMedicine.description}
-          onChange={(e) =>
-            setNewMedicine({
-              ...newMedicine,
-              description: e.target.value
-            })
-          }
-          rows={3}
-          className="w-full border border-slate-200 rounded-xl p-3 outline-none focus:border-blue-400 resize-none"
-        />
-      </div>
+            {medicines.length === 0 ? (
+
+              <tr>
+
+                <td
+                  colSpan={6}
+                  className="px-6 py-12 text-center text-sm text-slate-400"
+                >
+                  No medicines found.
+                </td>
+
+              </tr>
+
+            ) : (
+
+              medicines
+                .filter((medicine) => {
+
+                  const searchText =
+                    search.toLowerCase().trim();
+
+                  if (!searchText) {
+                    return true;
+                  }
+
+                  return (
+                    String(
+                      medicine.brand_name || ""
+                    )
+                      .toLowerCase()
+                      .includes(searchText) ||
+
+                    String(
+                      medicine.generic_name || ""
+                    )
+                      .toLowerCase()
+                      .includes(searchText)
+                  );
+
+                })
+                .map((medicine) => (
+
+                  <tr
+                    key={medicine.id}
+                    className="hover:bg-slate-50/50 transition-colors"
+                  >
+
+                    {/* ==================================
+                        MEDICINE
+                    ================================== */}
+                    <td className="px-6 py-4">
+
+                      <div className="flex items-center gap-3">
+
+                        <div className="w-9 h-9 rounded-lg bg-blue-50 flex items-center justify-center">
+
+                          <Pill
+                            size={17}
+                            className="text-blue-500"
+                          />
+
+                        </div>
+
+                        <div>
+
+                          <p className="text-sm font-semibold text-slate-800">
+                            {medicine.brand_name || "N/A"}
+                          </p>
+
+                          {medicine.dosage_form && (
+
+                            <p className="text-xs text-slate-400">
+                              {medicine.dosage_form}
+                            </p>
+
+                          )}
+
+                        </div>
+
+                      </div>
+
+                    </td>
 
 
-      {/* BUTTONS */}
-      <div className="flex justify-end gap-3 pt-2">
+                    {/* ==================================
+                        GENERIC
+                    ================================== */}
+                    <td className="px-6 py-4 text-sm text-slate-500">
 
-        <button
-          onClick={() => setShowAddModal(false)}
-          className="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-semibold text-sm hover:bg-slate-50"
-        >
-          Cancel
-        </button>
+                      {medicine.generic_name || "N/A"}
+
+                    </td>
 
 
-        <button
-          onClick={addMedicine}
-          className="px-5 py-2.5 rounded-xl bg-blue-600 text-white font-semibold text-sm hover:bg-blue-700"
-        >
-          Save Medicine
-        </button>
+                    {/* ==================================
+                        MANUFACTURER
+                    ================================== */}
+                    <td className="px-6 py-4 text-sm text-slate-500">
+
+                      {medicine.manufacturer
+                        ? medicine.manufacturer
+                        : medicine.manufacturer_id
+                        ? `Manufacturer #${medicine.manufacturer_id}`
+                        : "N/A"}
+
+                    </td>
+
+
+                    {/* ==================================
+                        CATEGORY
+                    ================================== */}
+                    <td className="px-6 py-4">
+
+                      <Badge
+                        label={
+                          medicine.category
+                            ? medicine.category
+                            : medicine.category_id
+                            ? `Category #${medicine.category_id}`
+                            : "N/A"
+                        }
+                        variant="blue"
+                      />
+
+                    </td>
+
+
+                    {/* ==================================
+                        STRENGTH
+                    ================================== */}
+                    <td className="px-6 py-4 text-sm text-slate-500">
+
+                      {medicine.strength || "N/A"}
+
+                    </td>
+
+
+                    {/* ==================================
+                        ACTIONS
+                    ================================== */}
+                    <td className="px-6 py-4">
+
+                      <div className="flex gap-2">
+
+                        {/* EDIT */}
+                        <button
+                          onClick={() => {
+
+                            setEditingId(
+                              medicine.id
+                            );
+
+                            setNewMedicine({
+
+                              brand_name:
+                                medicine.brand_name || "",
+
+                              generic_name:
+                                medicine.generic_name || "",
+
+                              manufacturer_id:
+                                medicine.manufacturer_id || "",
+
+                              category_id:
+                                medicine.category_id || "",
+
+                              strength:
+                                medicine.strength || "",
+
+                              dosage_form:
+                                medicine.dosage_form || "",
+
+                              description:
+                                medicine.description || "",
+
+                              image:
+                                medicine.image || "",
+
+                            });
+
+                            setShowEditModal(true);
+
+                          }}
+                          className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600"
+                          title="Edit Medicine"
+                        >
+                          <Edit2 size={14} />
+                        </button>
+
+
+                        {/* DELETE */}
+                        <button
+                          onClick={() =>
+                            deleteMedicine(
+                              medicine.id
+                            )
+                          }
+                          className="p-2 rounded-lg border border-red-200 text-red-600 hover:bg-red-50"
+                          title="Delete Medicine"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+
+                      </div>
+
+                    </td>
+
+                  </tr>
+
+                ))
+
+            )}
+
+          </tbody>
+
+        </table>
 
       </div>
 
     </div>
+
+
+    {/* ==========================================
+        ADD MEDICINE MODAL
+    ========================================== */}
+    {showAddModal && (
+
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+
+        <div className="bg-white rounded-2xl w-full max-w-[500px] p-6 space-y-4">
+
+          {/* HEADER */}
+          <div>
+
+            <h2 className="text-xl font-bold text-slate-800">
+              Add Medicine
+            </h2>
+
+            <p className="text-sm text-slate-400 mt-1">
+              Add a new medicine to the master database
+            </p>
+
+          </div>
+
+
+          {/* BRAND NAME */}
+          <div>
+
+            <label className="block text-sm font-semibold text-slate-600 mb-2">
+              Brand Name
+            </label>
+
+            <input
+              type="text"
+              placeholder="Enter brand name"
+              value={newMedicine.brand_name}
+              onChange={(e) =>
+                setNewMedicine({
+                  ...newMedicine,
+                  brand_name: e.target.value,
+                })
+              }
+              className="w-full border border-slate-200 rounded-xl p-3 outline-none focus:border-blue-400"
+            />
+
+          </div>
+
+
+          {/* GENERIC NAME */}
+          <div>
+
+            <label className="block text-sm font-semibold text-slate-600 mb-2">
+              Generic Name
+            </label>
+
+            <input
+              type="text"
+              placeholder="Enter generic name"
+              value={newMedicine.generic_name}
+              onChange={(e) =>
+                setNewMedicine({
+                  ...newMedicine,
+                  generic_name: e.target.value,
+                })
+              }
+              className="w-full border border-slate-200 rounded-xl p-3 outline-none focus:border-blue-400"
+            />
+
+          </div>
+
+
+          {/* MANUFACTURER */}
+          <div>
+
+            <label className="block text-sm font-semibold text-slate-600 mb-2">
+              Manufacturer
+            </label>
+
+            <select
+              value={newMedicine.manufacturer_id}
+              onChange={(e) =>
+                setNewMedicine({
+                  ...newMedicine,
+                  manufacturer_id:
+                    e.target.value,
+                })
+              }
+              className="w-full border border-slate-200 rounded-xl p-3 outline-none focus:border-blue-400 bg-white"
+            >
+
+              <option value="">
+                Select Manufacturer
+              </option>
+
+              {manufacturers.map(
+                (manufacturer) => (
+
+                  <option
+                    key={manufacturer.id}
+                    value={manufacturer.id}
+                  >
+                    {manufacturer.manufacturer_name}
+                  </option>
+
+                )
+              )}
+
+            </select>
+
+          </div>
+
+
+          {/* CATEGORY */}
+          <div>
+
+            <label className="block text-sm font-semibold text-slate-600 mb-2">
+              Category
+            </label>
+
+            <select
+              value={newMedicine.category_id}
+              onChange={(e) =>
+                setNewMedicine({
+                  ...newMedicine,
+                  category_id:
+                    e.target.value,
+                })
+              }
+              className="w-full border border-slate-200 rounded-xl p-3 outline-none focus:border-blue-400 bg-white"
+            >
+
+              <option value="">
+                Select Category
+              </option>
+
+              {categories.map(
+                (category) => (
+
+                  <option
+                    key={category.id}
+                    value={category.id}
+                  >
+                    {category.category_name}
+                  </option>
+
+                )
+              )}
+
+            </select>
+
+          </div>
+
+
+          {/* STRENGTH */}
+          <div>
+
+            <label className="block text-sm font-semibold text-slate-600 mb-2">
+              Strength
+            </label>
+
+            <input
+              type="text"
+              placeholder="Example: 500 mg"
+              value={newMedicine.strength}
+              onChange={(e) =>
+                setNewMedicine({
+                  ...newMedicine,
+                  strength: e.target.value,
+                })
+              }
+              className="w-full border border-slate-200 rounded-xl p-3 outline-none focus:border-blue-400"
+            />
+
+          </div>
+
+
+          {/* DOSAGE FORM */}
+          <div>
+
+            <label className="block text-sm font-semibold text-slate-600 mb-2">
+              Dosage Form
+            </label>
+
+            <select
+              value={newMedicine.dosage_form}
+              onChange={(e) =>
+                setNewMedicine({
+                  ...newMedicine,
+                  dosage_form: e.target.value,
+                })
+              }
+              className="w-full border border-slate-200 rounded-xl p-3 outline-none focus:border-blue-400 bg-white"
+            >
+
+              <option value="">
+                Select Dosage Form
+              </option>
+
+              <option value="Tablet">
+                Tablet
+              </option>
+
+              <option value="Capsule">
+                Capsule
+              </option>
+
+              <option value="Syrup">
+                Syrup
+              </option>
+
+              <option value="Injection">
+                Injection
+              </option>
+
+              <option value="Cream">
+                Cream
+              </option>
+
+              <option value="Ointment">
+                Ointment
+              </option>
+
+              <option value="Drops">
+                Drops
+              </option>
+
+              <option value="Inhaler">
+                Inhaler
+              </option>
+
+            </select>
+
+          </div>
+
+
+          {/* DESCRIPTION */}
+          <div>
+
+            <label className="block text-sm font-semibold text-slate-600 mb-2">
+              Description
+            </label>
+
+            <textarea
+              placeholder="Enter medicine description"
+              value={newMedicine.description}
+              onChange={(e) =>
+                setNewMedicine({
+                  ...newMedicine,
+                  description:
+                    e.target.value,
+                })
+              }
+              rows={3}
+              className="w-full border border-slate-200 rounded-xl p-3 outline-none focus:border-blue-400 resize-none"
+            />
+
+          </div>
+
+
+          {/* BUTTONS */}
+          <div className="flex justify-end gap-3 pt-2">
+
+            <button
+              onClick={() =>
+                setShowAddModal(false)
+              }
+              className="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-semibold text-sm hover:bg-slate-50"
+            >
+              Cancel
+            </button>
+
+            <button
+              onClick={addMedicine}
+              className="px-5 py-2.5 rounded-xl bg-blue-600 text-white font-semibold text-sm hover:bg-blue-700"
+            >
+              Save Medicine
+            </button>
+
+          </div>
+
+        </div>
+
+      </div>
+
+    )}
+
+
+    {/* ==========================================
+        EDIT MEDICINE MODAL
+    ========================================== */}
+    {showEditModal && (
+
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+
+        <div className="bg-white rounded-2xl w-full max-w-[500px] p-6 space-y-4">
+
+          <h2 className="text-xl font-bold text-slate-800">
+            Edit Medicine
+          </h2>
+
+
+          {/* BRAND */}
+          <input
+            placeholder="Brand Name"
+            value={newMedicine.brand_name}
+            onChange={(e) =>
+              setNewMedicine({
+                ...newMedicine,
+                brand_name:
+                  e.target.value,
+              })
+            }
+            className="w-full border border-slate-200 rounded-xl p-3"
+          />
+
+
+          {/* GENERIC */}
+          <input
+            placeholder="Generic Name"
+            value={newMedicine.generic_name}
+            onChange={(e) =>
+              setNewMedicine({
+                ...newMedicine,
+                generic_name:
+                  e.target.value,
+              })
+            }
+            className="w-full border border-slate-200 rounded-xl p-3"
+          />
+
+
+          {/* MANUFACTURER */}
+          <select
+            value={newMedicine.manufacturer_id}
+            onChange={(e) =>
+              setNewMedicine({
+                ...newMedicine,
+                manufacturer_id:
+                  e.target.value,
+              })
+            }
+            className="w-full border border-slate-200 rounded-xl p-3 bg-white"
+          >
+
+            <option value="">
+              Select Manufacturer
+            </option>
+
+            {manufacturers.map(
+              (manufacturer) => (
+
+                <option
+                  key={manufacturer.id}
+                  value={manufacturer.id}
+                >
+                  {manufacturer.manufacturer_name}
+                </option>
+
+              )
+            )}
+
+          </select>
+
+
+          {/* CATEGORY */}
+          <select
+            value={newMedicine.category_id}
+            onChange={(e) =>
+              setNewMedicine({
+                ...newMedicine,
+                category_id:
+                  e.target.value,
+              })
+            }
+            className="w-full border border-slate-200 rounded-xl p-3 bg-white"
+          >
+
+            <option value="">
+              Select Category
+            </option>
+
+            {categories.map(
+              (category) => (
+
+                <option
+                  key={category.id}
+                  value={category.id}
+                >
+                  {category.category_name}
+                </option>
+
+              )
+            )}
+
+          </select>
+
+
+          {/* STRENGTH */}
+          <input
+            placeholder="Strength"
+            value={newMedicine.strength}
+            onChange={(e) =>
+              setNewMedicine({
+                ...newMedicine,
+                strength:
+                  e.target.value,
+              })
+            }
+            className="w-full border border-slate-200 rounded-xl p-3"
+          />
+
+
+          {/* DOSAGE FORM */}
+          <select
+            value={newMedicine.dosage_form}
+            onChange={(e) =>
+              setNewMedicine({
+                ...newMedicine,
+                dosage_form:
+                  e.target.value,
+              })
+            }
+            className="w-full border border-slate-200 rounded-xl p-3 bg-white"
+          >
+
+            <option value="">
+              Select Dosage Form
+            </option>
+
+            <option value="Tablet">
+              Tablet
+            </option>
+
+            <option value="Capsule">
+              Capsule
+            </option>
+
+            <option value="Syrup">
+              Syrup
+            </option>
+
+            <option value="Injection">
+              Injection
+            </option>
+
+            <option value="Cream">
+              Cream
+            </option>
+
+            <option value="Ointment">
+              Ointment
+            </option>
+
+            <option value="Drops">
+              Drops
+            </option>
+
+            <option value="Inhaler">
+              Inhaler
+            </option>
+
+          </select>
+
+
+          {/* DESCRIPTION */}
+          <textarea
+            placeholder="Description"
+            value={newMedicine.description}
+            onChange={(e) =>
+              setNewMedicine({
+                ...newMedicine,
+                description:
+                  e.target.value,
+              })
+            }
+            rows={3}
+            className="w-full border border-slate-200 rounded-xl p-3 resize-none"
+          />
+
+
+          {/* BUTTONS */}
+          <div className="flex justify-end gap-3">
+
+            <button
+              onClick={() =>
+                setShowEditModal(false)
+              }
+              className="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-semibold text-sm"
+            >
+              Cancel
+            </button>
+
+            <button
+              onClick={editMedicine}
+              className="px-5 py-2.5 rounded-xl bg-blue-600 text-white font-semibold text-sm"
+            >
+              Update
+            </button>
+
+          </div>
+
+        </div>
+
+      </div>
+
+    )}
 
   </div>
-)}
-
-{showEditModal && (
-  <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-
-    <div className="bg-white rounded-2xl w-[500px] p-6 space-y-4">
-
-      <h2 className="text-xl font-bold">
-        Edit Medicine
-      </h2>
-
-      <input
-        placeholder="Brand Name"
-        value={newMedicine.brand_name}
-        onChange={(e)=>
-          setNewMedicine({
-            ...newMedicine,
-            brand_name:e.target.value
-          })
-        }
-        className="w-full border rounded-lg p-3"
-      />
-
-      <input
-        placeholder="Generic Name"
-        value={newMedicine.generic_name}
-        onChange={(e)=>
-          setNewMedicine({
-            ...newMedicine,
-            generic_name:e.target.value
-          })
-        }
-        className="w-full border rounded-lg p-3"
-      />
-
-      <input
-        placeholder="Manufacturer"
-        value={newMedicine.manufacturer}
-        onChange={(e)=>
-          setNewMedicine({
-            ...newMedicine,
-            manufacturer:e.target.value
-          })
-        }
-        className="w-full border rounded-lg p-3"
-      />
-
-      <input
-        placeholder="Category"
-        value={newMedicine.category}
-        onChange={(e)=>
-          setNewMedicine({
-            ...newMedicine,
-            category:e.target.value
-          })
-        }
-        className="w-full border rounded-lg p-3"
-      />
-
-      <input
-        placeholder="Strength"
-        value={newMedicine.strength}
-        onChange={(e)=>
-          setNewMedicine({
-            ...newMedicine,
-            strength:e.target.value
-          })
-        }
-        className="w-full border rounded-lg p-3"
-      />
-
-      <textarea
-        placeholder="Description"
-        value={newMedicine.description}
-        onChange={(e)=>
-          setNewMedicine({
-            ...newMedicine,
-            description:e.target.value
-          })
-        }
-        className="w-full border rounded-lg p-3"
-      />
-
-      <div className="flex justify-end gap-3">
-
-        <button
-          onClick={() => setShowEditModal(false)}
-          className="px-5 py-2 rounded-lg border"
-        >
-          Cancel
-        </button>
-
-        <button
-          onClick={editMedicine}
-          className="px-5 py-2 rounded-lg bg-blue-600 text-white"
-        >
-          Update
-        </button>
-
-      </div>
-
-    </div>
-
-  </div>
-)}
-    </div>
-  );
+);
 }
 
 function ReportsPage() {
@@ -9844,13 +10290,9 @@ function PharmacyReservations() {
               </div>
 
             )}
-
           </>
-
         )}
-
       </div>
-
     </div>
   );
 }

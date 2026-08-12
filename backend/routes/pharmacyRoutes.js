@@ -29,6 +29,8 @@ router.get(
 
 // ==========================================
 // APPROVED PHARMACIES
+// GET /api/pharmacies/approved
+// IMPORTANT: MUST COME BEFORE /:id
 // ==========================================
 
 router.get(
@@ -39,6 +41,7 @@ router.get(
 
 // ==========================================
 // ADMIN - ALL PHARMACIES
+// GET /api/pharmacies/all
 // IMPORTANT: MUST COME BEFORE /:id
 // ==========================================
 
@@ -50,6 +53,7 @@ router.get(
 
 // ==========================================
 // CREATE PHARMACY
+// POST /api/pharmacies
 // ==========================================
 
 router.post(
@@ -60,6 +64,7 @@ router.post(
 
 // ==========================================
 // ADMIN - APPROVE PHARMACY
+// PUT /api/pharmacies/:id/approve
 // ==========================================
 
 router.put(
@@ -71,6 +76,7 @@ router.put(
 
 // ==========================================
 // ADMIN - REJECT PHARMACY
+// PUT /api/pharmacies/:id/reject
 // ==========================================
 
 router.put(
@@ -82,6 +88,7 @@ router.put(
 
 // ==========================================
 // UPDATE PHARMACY
+// PUT /api/pharmacies/:id
 // ==========================================
 
 router.put(
@@ -93,6 +100,7 @@ router.put(
 
 // ==========================================
 // GET SINGLE PHARMACY
+// GET /api/pharmacies/:id
 // IMPORTANT: KEEP THIS LAST
 // ==========================================
 
