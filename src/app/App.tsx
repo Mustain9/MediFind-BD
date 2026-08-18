@@ -153,17 +153,11 @@ const RESERVATIONS = [
   { id: "RES-005", patient: "Tanvir Ahmed", medicine: "Montiget 10", qty: 2, date: "25 Jun 2026", status: "Completed" },
 ];
 
-
-
-
-
-
 const PENDING_PHARMACIES = [
   { id: 1, name: "HealthPlus Pharmacy", owner: "Mizanur Rahman", area: "Uttara, Dhaka", applied: "25 Jun 2026", license: "DDA-2026-1234" },
   { id: 2, name: "MediCare Drug Store", owner: "Farida Yasmin", area: "Motijheel, Dhaka", applied: "24 Jun 2026", license: "DDA-2026-1235" },
   { id: 3, name: "Green Cross Pharmacy", owner: "Shafiqul Alam", area: "Banani, Dhaka", applied: "23 Jun 2026", license: "DDA-2026-1236" },
 ];
-
 
 // ─── Shared UI primitives ────────────────────────────────────────────────────
 
@@ -2133,6 +2127,65 @@ function MedicineSearchPage({
 
 
     // ==========================================
+    // AI MEDICINE ASSISTANT
+    // ==========================================
+
+    const [aiQuery, setAiQuery] = useState("");
+    const [aiLoading, setAiLoading] = useState(false);
+    const [aiError, setAiError] = useState("");
+    const [aiResult, setAiResult] = useState<any>(null);
+
+
+    const handleAISearch = async () => {
+
+        if (!aiQuery.trim()) {
+            return;
+        }
+
+        try {
+
+            setAiLoading(true);
+            setAiError("");
+            setAiResult(null);
+
+            const response = await api.post(
+                "/ai/medicine-search",
+                {
+                    message: aiQuery.trim()
+                }
+            );
+
+            console.log("AI SEARCH RESPONSE:", response.data);
+
+            if (response.data?.success) {
+                setAiResult(response.data);
+            } else {
+                setAiError(
+                    response.data?.message ||
+                    "AI could not process your request."
+                );
+            }
+
+        } catch (error: any) {
+
+            console.error(
+                "AI SEARCH ERROR:",
+                error.response?.data || error
+            );
+
+            setAiError(
+                error.response?.data?.message ||
+                error.message ||
+                "Failed to connect to AI service."
+            );
+
+        } finally {
+            setAiLoading(false);
+        }
+    };
+
+
+    // ==========================================
     // LOAD MEDICINE AVAILABILITY
     // ==========================================
 
@@ -2436,6 +2489,167 @@ function MedicineSearchPage({
                     </button>
 
                 </div>
+
+            </div>
+
+
+            {/* ==========================================
+                AI MEDICINE ASSISTANT
+            ========================================== */}
+
+            <div className="bg-gradient-to-r from-indigo-600 via-blue-600 to-cyan-600 rounded-2xl p-6 text-white shadow-sm">
+
+                <div className="flex items-start gap-4">
+
+                    <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0">
+                        <Stethoscope size={24} className="text-white" />
+                    </div>
+
+                    <div className="flex-1">
+                        <h2 className="text-lg font-bold">MediFind AI Assistant</h2>
+                        <p className="text-sm text-blue-100 mt-1">
+                            Search medicines using natural language.
+                        </p>
+                    </div>
+
+                </div>
+
+                <div className="mt-5 flex gap-3">
+
+                    <div className="flex-1 flex items-center gap-3 px-4 py-3 rounded-xl bg-white/15 border border-white/20">
+
+                        <Search size={18} className="text-blue-100" />
+
+                        <input
+                            value={aiQuery}
+                            onChange={(e) => setAiQuery(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                    handleAISearch();
+                                }
+                            }}
+                            className="flex-1 bg-transparent outline-none text-sm text-white placeholder:text-blue-200"
+                            placeholder="Example: Find Napa Extra under ৳50 near me..."
+                        />
+
+                    </div>
+
+                    <button
+                        onClick={handleAISearch}
+                        disabled={aiLoading || !aiQuery.trim()}
+                        className="px-6 py-3 bg-white text-blue-600 rounded-xl text-sm font-semibold hover:bg-blue-50 transition-colors disabled:opacity-50"
+                    >
+                        {aiLoading ? "Thinking..." : "Ask AI"}
+                    </button>
+
+                </div>
+
+                {aiError && (
+                    <div className="mt-4 bg-red-500/20 border border-red-300/30 rounded-xl p-3">
+                        <p className="text-sm text-white">{aiError}</p>
+                    </div>
+                )}
+
+                {aiResult && (
+                    <div className="mt-5 bg-white rounded-xl p-5 text-slate-800">
+
+                        <div className="flex items-center justify-between mb-3">
+                            <h3 className="font-bold">AI Result</h3>
+                            <button
+                                onClick={() => {
+                                    setAiResult(null);
+                                    setAiQuery("");
+                                }}
+                                className="text-xs text-slate-400 hover:text-slate-600"
+                            >
+                                Clear
+                            </button>
+                        </div>
+
+                        {aiResult.ai?.message && (
+                            <p className="text-sm text-slate-600 mb-4">
+                                {aiResult.ai.message}
+                            </p>
+                        )}
+
+                        {aiResult.ai && (
+                            <div className="flex flex-wrap gap-2 mb-4">
+                                {(aiResult.ai.search_terms || []).map((term: string) => (
+                                    <span
+                                        key={term}
+                                        className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-xs font-medium"
+                                    >
+                                        {term}
+                                    </span>
+                                ))}
+
+                                {aiResult.ai.max_price && (
+                                    <span className="px-3 py-1 bg-green-50 text-green-600 rounded-full text-xs font-medium">
+                                        Up to ৳{aiResult.ai.max_price}
+                                    </span>
+                                )}
+
+                                {aiResult.ai.location_requested && (
+                                    <span className="px-3 py-1 bg-purple-50 text-purple-600 rounded-full text-xs font-medium">
+                                        Near location
+                                    </span>
+                                )}
+                            </div>
+                        )}
+
+                        {Array.isArray(aiResult.results) && aiResult.results.length > 0 ? (
+                            <div className="space-y-3">
+                                {aiResult.results.map((result: any, index: number) => (
+                                    <div
+                                        key={result.medicine_id || result.pharmacy_id || index}
+                                        className="border border-slate-100 rounded-xl p-4"
+                                    >
+                                        <div className="flex items-center justify-between gap-4">
+                                            <div>
+                                                <p className="font-semibold text-slate-800">
+                                                    {result.brand_name || "Medicine"}
+                                                </p>
+
+                                                {result.generic_name && (
+                                                    <p className="text-xs text-slate-400">
+                                                        {result.generic_name}
+                                                    </p>
+                                                )}
+
+                                                {result.pharmacy_name && (
+                                                    <p className="text-xs text-slate-500 mt-2">
+                                                        📍 {result.pharmacy_name}
+                                                    </p>
+                                                )}
+                                            </div>
+
+                                            <div className="text-right">
+                                                {result.price != null && (
+                                                    <p className="font-bold text-blue-600">
+                                                        ৳{Number(result.price).toFixed(2)}
+                                                    </p>
+                                                )}
+
+                                                {result.stock != null && (
+                                                    <p className="text-xs text-green-600">
+                                                        {result.stock} in stock
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="bg-slate-50 rounded-xl p-4 text-center">
+                                <p className="text-sm text-slate-500">
+                                    No matching pharmacy inventory found.
+                                </p>
+                            </div>
+                        )}
+
+                    </div>
+                )}
 
             </div>
 
@@ -10230,68 +10444,672 @@ const deleteMedicine = async (id: number) => {
 }
 
 function ReportsPage() {
-  return (
-    <div className="p-6 space-y-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800">Reports & Analytics</h1>
-          <p className="text-slate-500 text-sm mt-1">Platform performance overview</p>
+  const [searchData, setSearchData] = useState<any[]>([]);
+  const [salesData, setSalesData] = useState<any[]>([]);
+
+  const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
+  const [error, setError] = useState("");
+
+  // ==========================================
+  // LOAD REPORT DATA
+  // ==========================================
+
+  const loadReports = async () => {
+    try {
+      setLoading(true);
+      setError("");
+
+      // ----------------------------------------
+      // LOAD ADMIN DASHBOARD DATA
+      // ----------------------------------------
+
+      const response = await api.get("/admin/dashboard");
+
+      console.log(
+        "REPORT DATA:",
+        response.data
+      );
+
+      if (!response.data?.success) {
+        throw new Error(
+          response.data?.message ||
+          "Failed to load report data."
+        );
+      }
+
+      // ----------------------------------------
+      // WEEKLY RESERVATIONS
+      // ----------------------------------------
+      //
+      // We use the reservation data returned
+      // by the backend if available.
+      //
+
+      if (
+        Array.isArray(
+          response.data?.weeklyReservations
+        )
+      ) {
+        setSalesData(
+          response.data.weeklyReservations
+        );
+      } else {
+        // Keep the same chart structure
+        // if weekly data is not yet available.
+
+        setSalesData([
+          {
+            day: "Mon",
+            reservations: 0
+          },
+          {
+            day: "Tue",
+            reservations: 0
+          },
+          {
+            day: "Wed",
+            reservations: 0
+          },
+          {
+            day: "Thu",
+            reservations: 0
+          },
+          {
+            day: "Fri",
+            reservations: 0
+          },
+          {
+            day: "Sat",
+            reservations: 0
+          },
+          {
+            day: "Sun",
+            reservations: 0
+          }
+        ]);
+      }
+
+      // ----------------------------------------
+      // MOST SEARCHED MEDICINES
+      // ----------------------------------------
+      //
+      // If search statistics are available
+      // from backend, use them.
+      //
+
+      if (
+        Array.isArray(
+          response.data?.mostSearchedMedicines
+        )
+      ) {
+        setSearchData(
+          response.data.mostSearchedMedicines
+        );
+      } else {
+        setSearchData([]);
+      }
+
+    } catch (error: any) {
+
+      console.error(
+        "FAILED TO LOAD REPORTS:",
+        error.response?.data || error
+      );
+
+      setError(
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to load reports."
+      );
+
+      setSearchData([]);
+      setSalesData([]);
+
+    } finally {
+
+      setLoading(false);
+
+    }
+  };
+
+
+  // ==========================================
+  // LOAD REPORTS WHEN PAGE OPENS
+  // ==========================================
+
+  useEffect(() => {
+    loadReports();
+  }, []);
+
+
+  // ==========================================
+  // EXPORT REPORT
+  // ==========================================
+
+  const exportReport = () => {
+
+    try {
+
+      setExporting(true);
+
+      const rows = [
+        [
+          "Report",
+          "Value"
+        ],
+
+        [
+          "Generated",
+          new Date().toLocaleString()
+        ],
+
+        [],
+        [
+          "Most Searched Medicines",
+          ""
+        ],
+
+        [
+          "Medicine",
+          "Searches"
+        ],
+
+        ...searchData.map(
+          (item: any) => [
+            item.name,
+            item.searches
+          ]
+        ),
+
+        [],
+        [
+          "Weekly Reservations",
+          ""
+        ],
+
+        [
+          "Day",
+          "Reservations"
+        ],
+
+        ...salesData.map(
+          (item: any) => [
+            item.day,
+            item.reservations
+          ]
+        )
+      ];
+
+
+      const csv = rows
+        .map(row =>
+          row
+            .map(value => {
+
+              const text =
+                value === null ||
+                value === undefined
+                  ? ""
+                  : String(value);
+
+              return `"${text.replace(
+                /"/g,
+                '""'
+              )}"`;
+
+            })
+            .join(",")
+        )
+        .join("\n");
+
+
+      const blob = new Blob(
+        [csv],
+        {
+          type: "text/csv;charset=utf-8;"
+        }
+      );
+
+
+      const url =
+        URL.createObjectURL(blob);
+
+      const link =
+        document.createElement("a");
+
+      link.href = url;
+
+      link.download =
+        `medifind-report-${new Date()
+          .toISOString()
+          .slice(0, 10)}.csv`;
+
+      document.body.appendChild(link);
+
+      link.click();
+
+      document.body.removeChild(link);
+
+      URL.revokeObjectURL(url);
+
+    } catch (error) {
+
+      console.error(
+        "REPORT EXPORT ERROR:",
+        error
+      );
+
+      alert(
+        "Failed to export report."
+      );
+
+    } finally {
+
+      setExporting(false);
+
+    }
+  };
+
+
+  // ==========================================
+  // LOADING
+  // ==========================================
+
+  if (loading) {
+
+    return (
+      <div className="p-6">
+
+        <div className="bg-white rounded-2xl p-10 shadow-sm border border-black/5 text-center">
+
+          <div className="animate-spin w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full mx-auto mb-4" />
+
+          <p className="text-sm text-slate-500">
+            Loading reports...
+          </p>
+
         </div>
-        <button className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-600 rounded-xl text-sm font-semibold hover:bg-slate-50">
-          <Download size={16} />Export Report
-        </button>
+
       </div>
+    );
+  }
+
+
+  return (
+
+    <div className="p-6 space-y-5">
+
+      {/* ==================================
+          HEADER
+      ================================== */}
+
+      <div className="flex items-center justify-between">
+
+        <div>
+
+          <h1 className="text-2xl font-bold text-slate-800">
+            Reports & Analytics
+          </h1>
+
+          <p className="text-slate-500 text-sm mt-1">
+            Platform performance overview
+          </p>
+
+        </div>
+
+
+        <button
+          onClick={exportReport}
+          disabled={exporting}
+          className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-600 rounded-xl text-sm font-semibold hover:bg-slate-50 disabled:opacity-50"
+        >
+
+          <Download size={16} />
+
+          {exporting
+            ? "Exporting..."
+            : "Export Report"}
+
+        </button>
+
+      </div>
+
+
+      {/* ==================================
+          ERROR
+      ================================== */}
+
+      {error && (
+
+        <div className="bg-red-50 border border-red-200 text-red-600 rounded-xl px-4 py-3 text-sm">
+
+          {error}
+
+          <button
+            onClick={loadReports}
+            className="ml-3 font-semibold underline"
+          >
+            Try Again
+          </button>
+
+        </div>
+
+      )}
+
+
+      {/* ==================================
+          SAME TWO CHARTS
+      ================================== */}
 
       <div className="grid grid-cols-2 gap-5">
-        {/* Most searched */}
+
+        {/* ==================================
+            MOST SEARCHED MEDICINES
+        ================================== */}
+
         <div className="bg-white rounded-2xl p-5 shadow-sm border border-black/5">
-          <h3 className="font-bold text-slate-800 mb-4">Most Searched Medicines</h3>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={searchData} layout="vertical" barSize={10}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
-              <XAxis type="number" tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
-              <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: "#64748b" }} axisLine={false} tickLine={false} width={90} />
-              <Tooltip contentStyle={{ borderRadius: 12, border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }} />
-              <Bar dataKey="searches" fill="#2563eb" radius={[0, 4, 4, 0]} name="Searches" />
-            </BarChart>
-          </ResponsiveContainer>
+
+          <h3 className="font-bold text-slate-800 mb-4">
+            Most Searched Medicines
+          </h3>
+
+
+          {searchData.length === 0 ? (
+
+            <div className="h-[220px] flex items-center justify-center text-sm text-slate-400">
+
+              No medicine search data available.
+
+            </div>
+
+          ) : (
+
+            <ResponsiveContainer
+              width="100%"
+              height={220}
+            >
+
+              <BarChart
+                data={searchData}
+                layout="vertical"
+                barSize={10}
+              >
+
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  stroke="#f1f5f9"
+                  horizontal={false}
+                />
+
+
+                <XAxis
+                  type="number"
+                  tick={{
+                    fontSize: 11,
+                    fill: "#94a3b8"
+                  }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+
+
+                <YAxis
+                  type="category"
+                  dataKey="name"
+                  tick={{
+                    fontSize: 11,
+                    fill: "#64748b"
+                  }}
+                  axisLine={false}
+                  tickLine={false}
+                  width={90}
+                />
+
+
+                <Tooltip
+                  contentStyle={{
+                    borderRadius: 12,
+                    border: "none",
+                    boxShadow:
+                      "0 4px 20px rgba(0,0,0,0.1)"
+                  }}
+                />
+
+
+                <Bar
+                  dataKey="searches"
+                  fill="#2563eb"
+                  radius={[
+                    0,
+                    4,
+                    4,
+                    0
+                  ]}
+                  name="Searches"
+                />
+
+              </BarChart>
+
+            </ResponsiveContainer>
+
+          )}
+
         </div>
 
-        {/* Reservation stats */}
+
+        {/* ==================================
+            WEEKLY RESERVATIONS
+        ================================== */}
+
         <div className="bg-white rounded-2xl p-5 shadow-sm border border-black/5">
-          <h3 className="font-bold text-slate-800 mb-4">Weekly Reservations</h3>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={salesData} barSize={10}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-              <XAxis dataKey="day" tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
-              <Tooltip contentStyle={{ borderRadius: 12, border: "none", boxShadow: "0 4px 20px rgba(0,0,0,0.1)" }} />
-              <Bar dataKey="reservations" fill="#16a34a" radius={[4, 4, 0, 0]} name="Reservations" />
-            </BarChart>
-          </ResponsiveContainer>
+
+          <h3 className="font-bold text-slate-800 mb-4">
+            Weekly Reservations
+          </h3>
+
+
+          {salesData.length === 0 ? (
+
+            <div className="h-[220px] flex items-center justify-center text-sm text-slate-400">
+
+              No reservation data available.
+
+            </div>
+
+          ) : (
+
+            <ResponsiveContainer
+              width="100%"
+              height={220}
+            >
+
+              <BarChart
+                data={salesData}
+                barSize={10}
+              >
+
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  stroke="#f1f5f9"
+                />
+
+
+                <XAxis
+                  dataKey="day"
+                  tick={{
+                    fontSize: 11,
+                    fill: "#94a3b8"
+                  }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+
+
+                <YAxis
+                  tick={{
+                    fontSize: 11,
+                    fill: "#94a3b8"
+                  }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+
+
+                <Tooltip
+                  contentStyle={{
+                    borderRadius: 12,
+                    border: "none",
+                    boxShadow:
+                      "0 4px 20px rgba(0,0,0,0.1)"
+                  }}
+                />
+
+
+                <Bar
+                  dataKey="reservations"
+                  fill="#16a34a"
+                  radius={[
+                    4,
+                    4,
+                    0,
+                    0
+                  ]}
+                  name="Reservations"
+                />
+
+              </BarChart>
+
+            </ResponsiveContainer>
+
+          )}
+
         </div>
+
       </div>
+
+
+      {/* ==================================
+          REPORT SUMMARY CARDS
+      ================================== */}
 
       <div className="grid grid-cols-4 gap-5">
-        {[
-          { title: "Medicine Search Stats", desc: "1,240 searches today", icon: TrendingUp, color: "bg-blue-50 text-blue-600" },
-          { title: "Reservation Report", desc: "342 this week", icon: FileText, color: "bg-green-50 text-green-600" },
-          { title: "Pharmacy Performance", desc: "86 active pharmacies", icon: Building2, color: "bg-amber-50 text-amber-600" },
-          { title: "User Growth", desc: "+248 this week", icon: Users, color: "bg-purple-50 text-purple-600" },
-        ].map(c => (
-          <div key={c.title} className="bg-white rounded-2xl p-5 shadow-sm border border-black/5 hover:shadow-md cursor-pointer transition-shadow">
-            <div className={`w-10 h-10 rounded-xl ${c.color} flex items-center justify-center mb-3`}>
-              <c.icon size={18} />
-            </div>
-            <h4 className="font-bold text-slate-800 text-sm">{c.title}</h4>
-            <p className="text-xs text-slate-400 mt-1">{c.desc}</p>
-            <button className="mt-3 text-xs text-blue-600 hover:underline flex items-center gap-1">
-              View Report <ChevronRight size={12} />
-            </button>
+
+        <div className="bg-white rounded-2xl p-5 shadow-sm border border-black/5">
+
+          <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center mb-3">
+
+            <TrendingUp
+              size={20}
+              className="text-blue-600"
+            />
+
           </div>
-        ))}
+
+          <h3 className="font-bold text-slate-800">
+            Medicine Search Stats
+          </h3>
+
+          <p className="text-sm text-slate-500 mt-1">
+
+            {searchData.reduce(
+              (
+                total: number,
+                item: any
+              ) =>
+                total +
+                Number(
+                  item.searches || 0
+                ),
+              0
+            ).toLocaleString()} searches
+
+          </p>
+
+        </div>
+
+
+        <div className="bg-white rounded-2xl p-5 shadow-sm border border-black/5">
+
+          <div className="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center mb-3">
+
+            <FileText
+              size={20}
+              className="text-green-600"
+            />
+
+          </div>
+
+          <h3 className="font-bold text-slate-800">
+            Reservation Report
+          </h3>
+
+          <p className="text-sm text-slate-500 mt-1">
+
+            {salesData.reduce(
+              (
+                total: number,
+                item: any
+              ) =>
+                total +
+                Number(
+                  item.reservations || 0
+                ),
+              0
+            ).toLocaleString()} this week
+
+          </p>
+
+        </div>
+
+
+        <div className="bg-white rounded-2xl p-5 shadow-sm border border-black/5">
+
+          <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center mb-3">
+
+            <Building2
+              size={20}
+              className="text-amber-600"
+            />
+
+          </div>
+
+          <h3 className="font-bold text-slate-800">
+            Pharmacy Performance
+          </h3>
+
+          <p className="text-sm text-slate-500 mt-1">
+            Live pharmacy data
+          </p>
+
+        </div>
+
+
+        <div className="bg-white rounded-2xl p-5 shadow-sm border border-black/5">
+
+          <div className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center mb-3">
+
+            <Users
+              size={20}
+              className="text-purple-600"
+            />
+
+          </div>
+
+          <h3 className="font-bold text-slate-800">
+            User Growth
+          </h3>
+
+          <p className="text-sm text-slate-500 mt-1">
+            Live user data
+          </p>
+
+        </div>
+
       </div>
+
     </div>
+
   );
 }
 

@@ -14,6 +14,7 @@ const pharmacyRoutes = require("./routes/pharmacyRoutes");
 const reservationRoutes = require("./routes/reservationRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const manufacturerRoutes = require("./routes/manufacturerRoutes");
+const aiRoutes = require("./routes/aiRoutes");
 
 const verifyToken = require("./middleware/authMiddleware");
 
@@ -41,6 +42,9 @@ app.get("/api/test", (req, res) => {
         message: "Backend Connected Successfully"
     });
 });
+
+
+app.use("/api/ai", aiRoutes);
 
 // ==========================================
 // ADMIN ROUTES
