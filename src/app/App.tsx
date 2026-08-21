@@ -646,7 +646,7 @@ function LoginPage({
       // ==============================
 
       const response = await fetch(
-        "http://localhost:5000/api/auth/login",
+        "https://medifind-bd.onrender.com/api/auth/login",
         {
           method: "POST",
 
@@ -1017,7 +1017,7 @@ function RegisterPage({
       // ==========================================
 
       const response = await fetch(
-        "http://localhost:5000/api/auth/register",
+        "https://medifind-bd.onrender.com/api/auth/register",
         {
           method: "POST",
 
@@ -8895,7 +8895,7 @@ function AdminPharmacyApproval() {
       setLoading(true);
 
       const response = await fetch(
-        "http://localhost:5000/api/pharmacies/all"
+        "https://medifind-bd.onrender.com/api/pharmacies/all"
       );
 
       const data = await response.json();
@@ -8930,7 +8930,7 @@ function AdminPharmacyApproval() {
       setProcessingId(id);
 
       const response = await fetch(
-        `http://localhost:5000/api/pharmacies/${id}/approve`,
+        `https://medifind-bd.onrender.com/api/pharmacies/${id}/approve`,
         {
           method: "PUT",
           headers: {
@@ -8982,7 +8982,7 @@ function AdminPharmacyApproval() {
       setProcessingId(id);
 
       const response = await fetch(
-        `http://localhost:5000/api/pharmacies/${id}/reject`,
+        `https://medifind-bd.onrender.com/api/pharmacies/${id}/reject`,
         {
           method: "PUT",
           headers: {
@@ -9351,7 +9351,7 @@ const loadMedicines = async () => {
     try {
 
         const response = await fetch(
-            "http://localhost:5000/api/medicines/stats"
+            "https://medifind-bd.onrender.com/api/medicines/stats"
         );
 
         const data = await response.json();
@@ -9433,7 +9433,7 @@ const editMedicine = async () => {
     try {
 
         const response = await fetch(
-            `http://localhost:5000/api/medicines/${editingId}`,
+            `https://medifind-bd.onrender.com/api/medicines/${editingId}`,
             {
                 method: "PUT",
                 headers: {
@@ -9475,7 +9475,7 @@ const deleteMedicine = async (id: number) => {
     try {
 
         const response = await fetch(
-            `http://localhost:5000/api/medicines/${id}`,
+            `https://medifind-bd.onrender.com/api/medicines/${id}`,
             {
                 method: "DELETE"
             }
@@ -9503,8 +9503,8 @@ const deleteMedicine = async (id: number) => {
       const loadMedicineOptions = async () => {
         try {
           const [categoryRes, manufacturerRes] = await Promise.all([
-            fetch("http://localhost:5000/api/categories"),
-            fetch("http://localhost:5000/api/manufacturers")
+            fetch("https://medifind-bd.onrender.com/api/categories"),
+            fetch("https://medifind-bd.onrender.com/api/manufacturers")
           ]);
 
           const categoryData = await categoryRes.json();
@@ -11130,7 +11130,7 @@ function SettingsPage() {
     const token=localStorage.getItem("token");
 
     const response=await fetch(
-        "http://localhost:5000/api/user/profile",
+        "https://medifind-bd.onrender.com/api/user/profile",
         {
 
             headers:{
@@ -11153,7 +11153,7 @@ const handleUpdateProfile=async()=>{
     const token=localStorage.getItem("token");
 
     const response=await fetch(
-        "http://localhost:5000/api/user/profile",
+        "https://medifind-bd.onrender.com/api/user/profile",
         {
 
             method:"PUT",
